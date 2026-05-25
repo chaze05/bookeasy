@@ -33,13 +33,14 @@ model Business {
   created_at              DateTime @default(now()) @db.Timestamptz(6)
   updated_at              DateTime @default(now()) @db.Timestamptz(6)
 
-  services      Service[]
-  staff         Staff[]
-  bookings      Booking[]
-  blocked_dates BlockedDate[]
-  availability  Availability[]
-  notifications Notification[]
-  audit_logs    AuditLog[]
+  services        Service[]
+  staff           Staff[]
+  bookings        Booking[]
+  blocked_dates   BlockedDate[]
+  availability    Availability[]
+  notifications   Notification[]
+  audit_logs      AuditLog[]
+  payment_methods PaymentMethod[]
 
   @@map("businesses")
 }
@@ -162,6 +163,22 @@ model Notification {
   business Business? @relation(fields: [business_id], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model PaymentMethod {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id String   @db.Uuid
+  type        String   // stripe | gcash | maya | wise | bank_transfer
+  label       String
+  is_enabled  Boolean  @default(true)
+  details     Json?    // type-specific config: account numbers, keys, links, etc.
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("payment_methods")
 }
 
 model AuditLog {

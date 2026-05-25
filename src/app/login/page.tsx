@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -15,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const {
@@ -27,7 +25,11 @@ export default function LoginPage() {
   });
 
   async function onSubmit(data: LoginInput) {
-    const { error } = await supabase.auth.signInWithPassword({
+    // Clear any existing session first — prevents cross-account data bleed
+    // when a different user logs in on the same browser.
+    await supabase.auth.signOut({ scope: "local" });
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     });
@@ -37,9 +39,20 @@ export default function LoginPage() {
       return;
     }
 
+    // Query role client-side — the browser Supabase client already holds the
+    // fresh session, so this is guaranteed to be correct. A server action call
+    // here would suffer from cookie-timing ambiguity.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .single();
+
+    const role = (profile as { role: string } | null)?.role;
+
     toast.success("Welcome back!");
-    router.push("/dashboard");
-    router.refresh();
+    // Hard navigate — flushes all React RSC cache from any previous session.
+    window.location.assign(role === "superadmin" ? "/superadmin" : "/dashboard");
   }
 
   return (
