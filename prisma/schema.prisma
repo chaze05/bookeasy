@@ -181,6 +181,17 @@ model PaymentMethod {
   @@map("payment_methods")
 }
 
+model HomepageConfig {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  section_key String
+  content     Json     @default("{}")
+  is_active   Boolean  @default(true)
+  order_index Int      @default(0)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("homepage_config")
+}
+
 model AuditLog {
   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   user_id     String?  @db.Uuid

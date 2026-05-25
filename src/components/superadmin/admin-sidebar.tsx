@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Bell,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,8 +55,9 @@ function buildNavSections(notifCount: number): NavSection[] {
     {
       label: "Platform",
       items: [
-        { label: "Payments", href: "/superadmin/payments", icon: CreditCard },
-        { label: "Settings", href: "/superadmin/settings", icon: Settings },
+        { label: "Homepage",  href: "/superadmin/homepage",  icon: LayoutTemplate },
+        { label: "Payments",  href: "/superadmin/payments",  icon: CreditCard },
+        { label: "Settings",  href: "/superadmin/settings",  icon: Settings },
       ],
     },
   ];
