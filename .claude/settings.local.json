@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const r = require\\('c:/escapegoat/booking-web-app/node_modules/radix-ui'\\); const dd = r.DropdownMenu; console.log\\(typeof dd.Root, typeof dd.Content, typeof dd.Item\\)\")",
+      "Bash(node -e \"const r = require\\('c:/escapegoat/booking-web-app/node_modules/radix-ui'\\); const av = r.Avatar; console.log\\(Object.keys\\(av\\)\\)\")"
+    ]
+  }
+}

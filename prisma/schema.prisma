@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// NOTE: owner_id / user_id fields reference auth.users (Supabase's
+// internal schema). Prisma cannot define FK relations to auth.*,
+// so those are plain String fields.  All authorisation is enforced
+// in application code rather than via Prisma relations.
+// ============================================================
+
+model Business {
+  id                      String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  owner_id                String   @db.Uuid
+  name                    String
+  slug                    String   @unique
+  description             String?
+  logo_url                String?
+  timezone                String   @default("UTC")
+  allow_multiple_bookings Boolean  @default(false)
+  max_bookings_per_slot   Int      @default(1)
+  booking_interval        Int      @default(30)
+  // text columns (not time) — see migration_001.sql note
+  business_hours_start    String   @default("09:00")
+  business_hours_end      String   @default("18:00")
+  realtime_enabled        Boolean  @default(true)
+  status                  String   @default("active")
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+
+  services      Service[]
+  staff         Staff[]
+  bookings      Booking[]
+  blocked_dates BlockedDate[]
+  availability  Availability[]
+  notifications Notification[]
+  audit_logs    AuditLog[]
+
+  @@map("businesses")
+}
+
+model Profile {
+  id         String   @id @db.Uuid
+  full_name  String?
+  avatar_url String?
+  phone      String?
+  role       String   @default("owner")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("profiles")
+}
+
+model Service {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id String   @db.Uuid
+  name        String
+  description String?
+  duration    Int
+  price       Decimal  @default(0) @db.Decimal(10, 2)
+  color       String   @default("#10b981")
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@map("services")
+}
+
+model Staff {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id String   @db.Uuid
+  user_id     String?  @db.Uuid
+  full_name   String
+  email       String?
+  avatar_url  String?
+  role        String   @default("staff")
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business      Business       @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+  availability  Availability[]
+  blocked_dates BlockedDate[]
+
+  @@map("staff")
+}
+
+model Availability {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id String   @db.Uuid
+  staff_id    String   @db.Uuid
+  day_of_week Int
+  // PostgreSQL time type — returned as DateTime; extract HH:mm in application code
+  start_time  DateTime @db.Time
+  end_time    DateTime @db.Time
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  staff    Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([staff_id, day_of_week, start_time])
+  @@map("availability")
+}
+
+model BlockedDate {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id String   @db.Uuid
+  staff_id    String?  @db.Uuid
+  blocked_on  DateTime @db.Date
+  reason      String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  staff    Staff?   @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([business_id, staff_id, blocked_on])
+  @@map("blocked_dates")
+}
+
+model Booking {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id    String   @db.Uuid
+  service_id     String   @db.Uuid
+  staff_id       String?  @db.Uuid
+  customer_name  String
+  customer_email String
+  customer_phone String?
+  starts_at      DateTime @db.Timestamptz(6)
+  ends_at        DateTime @db.Timestamptz(6)
+  status         String   @default("pending")
+  notes          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [service_id], references: [id])
+  staff    Staff?   @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+
+  @@map("bookings")
+}
+
+model Notification {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String    @db.Uuid
+  business_id String?   @db.Uuid
+  type        String    @default("system")
+  title       String
+  message     String
+  read_at     DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  business Business? @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String?  @db.Uuid
+  business_id String?  @db.Uuid
+  action      String
+  entity_type String
+  entity_id   String?  @db.Uuid
+  metadata    Json?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business? @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
