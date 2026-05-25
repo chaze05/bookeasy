@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, CalendarCheck, TrendingUp, Bell } from "lucide-react";
 
 interface HeroContent {
   badge?: string;
@@ -14,131 +13,243 @@ interface HeroContent {
   trust_line?: string;
 }
 
+const AVATARS = [
+  { initials: "JL", bg: "bg-violet-500" },
+  { initials: "MR", bg: "bg-blue-500" },
+  { initials: "SK", bg: "bg-amber-500" },
+  { initials: "AT", bg: "bg-pink-500" },
+  { initials: "CM", bg: "bg-emerald-500" },
+];
+
 export function HeroSection({ content }: { content: unknown }) {
   const c = (content ?? {}) as HeroContent;
 
   return (
-    <section className="relative flex flex-col items-center px-4 pb-24 pt-32 text-center sm:px-6">
-      {/* Ambient glow */}
+    <section className="hero-grid-bg relative isolate overflow-hidden px-4 pb-16 pt-24 sm:px-6 sm:pt-32">
+      {/* Top emerald glow */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 flex items-start justify-center overflow-hidden"
-      >
-        <div className="h-[700px] w-[700px] rounded-full bg-emerald-500/10 blur-[140px]" />
-      </div>
+        className="pointer-events-none absolute -top-32 left-1/2 -z-10 h-[600px] w-[900px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[100px]"
+      />
 
-      <div className="relative max-w-3xl">
+      {/* Badge */}
+      <div className="mb-8 flex justify-center">
         {c.badge && (
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-4 py-2 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/15">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
             {c.badge}
           </div>
         )}
+      </div>
 
-        <h1 className="mb-6 text-5xl font-bold leading-tight tracking-tight text-zinc-100 sm:text-6xl lg:text-7xl">
+      {/* Headline */}
+      <div className="mx-auto max-w-4xl text-center">
+        <h1 className="text-balance mb-7 text-5xl font-extrabold tracking-tight text-zinc-50 sm:text-6xl lg:text-[5rem] lg:leading-[1.05]">
           {c.title ?? "Booking software that"}{" "}
-          <span className="gradient-text">{c.title_highlight ?? "just works."}</span>
+          <span className="gradient-text-emerald italic">
+            {c.title_highlight ?? "just works."}
+          </span>
         </h1>
 
         {c.subtitle && (
-          <p className="mx-auto mb-4 max-w-xl text-lg leading-relaxed text-zinc-400">
+          <p className="mx-auto mb-10 max-w-2xl text-lg leading-8 text-zinc-400">
             {c.subtitle}
           </p>
         )}
 
-        {c.trust_line && (
-          <p className="mb-10 text-sm text-zinc-500">{c.trust_line}</p>
-        )}
-
-        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <Button
-            asChild
-            size="lg"
-            className="h-12 gap-2 bg-emerald-500 px-8 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400"
+        {/* CTAs */}
+        <div className="mb-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link
+            href={c.primary_cta_href ?? "/register"}
+            className="group inline-flex h-12 items-center gap-2 rounded-xl bg-emerald-500 px-8 text-sm font-semibold text-white shadow-xl shadow-emerald-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-400 hover:shadow-emerald-400/30"
           >
-            <Link href={c.primary_cta_href ?? "/register"}>
-              {c.primary_cta_text ?? "Start for free"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+            {c.primary_cta_text ?? "Start for free"}
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </Link>
 
           {c.secondary_cta_href && (
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="h-12 border-zinc-700 px-8 text-sm font-medium text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800 hover:text-zinc-100"
+            <Link
+              href={c.secondary_cta_href}
+              className="inline-flex h-12 items-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/60 px-8 text-sm font-medium text-zinc-300 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-800 hover:text-zinc-100"
             >
-              <Link href={c.secondary_cta_href}>
-                {c.secondary_cta_text ?? "See demo"}
-              </Link>
-            </Button>
+              {c.secondary_cta_text ?? "See demo"}
+            </Link>
           )}
         </div>
-      </div>
 
-      {/* Dashboard preview mockup */}
-      <div className="relative mt-20 w-full max-w-5xl">
-        <div className="glass-card overflow-hidden rounded-2xl">
-          <div className="flex h-8 items-center gap-1.5 border-b border-zinc-800 bg-zinc-900/60 px-4">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" />
-            <div className="mx-auto flex h-5 w-48 items-center justify-center rounded bg-zinc-800 px-3">
-              <span className="text-[9px] text-zinc-500">app.bookeasy.com/dashboard</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 gap-px bg-zinc-800 p-px">
-            {/* Sidebar */}
-            <div className="col-span-1 bg-zinc-900 p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500">
-                  <CalendarCheck className="h-3.5 w-3.5 text-white" />
-                </div>
-                <div className="h-2.5 w-16 rounded bg-zinc-800" />
-              </div>
-              {["Dashboard", "Bookings", "Services", "Staff", "Analytics", "Settings"].map((item) => (
-                <div key={item} className="mb-2 flex items-center gap-2">
-                  <div className="h-3.5 w-3.5 rounded bg-zinc-800" />
-                  <div className="h-2.5 rounded bg-zinc-800" style={{ width: `${item.length * 5.5}px` }} />
+        {/* Social proof strip */}
+        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-5">
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2.5">
+              {AVATARS.map((a) => (
+                <div
+                  key={a.initials}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-zinc-950 text-[10px] font-bold text-white ${a.bg}`}
+                >
+                  {a.initials}
                 </div>
               ))}
             </div>
+            <div className="text-left">
+              <div className="flex items-center gap-0.5">
+                {"★★★★★".split("").map((s, i) => (
+                  <span key={i} className="text-xs text-amber-400">{s}</span>
+                ))}
+              </div>
+              <p className="text-[11px] text-zinc-500">
+                {c.trust_line ?? "Trusted by 500+ businesses"}
+              </p>
+            </div>
+          </div>
 
-            {/* Main content */}
-            <div className="col-span-3 bg-zinc-900/50 p-6">
-              <div className="mb-4 grid grid-cols-3 gap-3">
-                {[
-                  { label: "Today's Bookings", val: "12", color: "emerald" },
-                  { label: "Week Revenue", val: "$1,840", color: "violet" },
-                  { label: "Active Clients", val: "48", color: "blue" },
-                ].map((s) => (
+          <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
+
+          <p className="text-[11px] text-zinc-500">
+            No credit card required
+          </p>
+        </div>
+      </div>
+
+      {/* Dashboard mockup */}
+      <div className="relative mx-auto mt-20 max-w-5xl px-4 sm:px-0">
+        {/* Floating notification card — top right */}
+        <div className="absolute -right-2 -top-5 z-20 hidden sm:block">
+          <div className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/90 px-4 py-3 shadow-2xl backdrop-blur-xl">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15">
+              <Bell className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-100">12 new bookings</p>
+              <p className="text-[10px] text-zinc-500">Today · Updated now</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Floating revenue card — bottom left */}
+        <div className="absolute -bottom-4 -left-2 z-20 hidden sm:block">
+          <div className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/90 px-4 py-3 shadow-2xl backdrop-blur-xl">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/15">
+              <TrendingUp className="h-4 w-4 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-100">$1,840 this week</p>
+              <p className="text-[10px] text-emerald-400">↑ 14% vs last week</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Browser chrome */}
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/80 shadow-2xl shadow-black/50 ring-1 ring-inset ring-white/5">
+          {/* Tab bar */}
+          <div className="flex h-9 items-center gap-2 border-b border-zinc-800 bg-zinc-900 px-4">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
+            </div>
+            <div className="mx-auto flex h-5 w-56 items-center justify-center gap-1.5 rounded-md bg-zinc-800/80 px-3">
+              <span className="h-2 w-2 rounded-full bg-emerald-500/60" />
+              <span className="text-[10px] text-zinc-500">app.bookeasy.com/dashboard</span>
+            </div>
+          </div>
+
+          {/* App layout */}
+          <div className="flex bg-zinc-950">
+            {/* Sidebar */}
+            <div className="hidden w-[180px] shrink-0 border-r border-zinc-800/60 bg-zinc-950 p-4 sm:block">
+              <div className="mb-5 flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500">
+                  <CalendarCheck className="h-3.5 w-3.5 text-white" />
+                </div>
+                <div className="h-2.5 w-16 rounded-md bg-zinc-800" />
+              </div>
+              <div className="mb-3">
+                <div className="mb-1.5 h-1.5 w-10 rounded bg-zinc-800/60" />
+                {["Dashboard", "Bookings", "Calendar"].map((item, i) => (
                   <div
-                    key={s.label}
-                    className="rounded-xl border border-zinc-800 bg-zinc-900 p-4"
+                    key={item}
+                    className={`mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5 ${i === 0 ? "bg-zinc-800/60" : ""}`}
                   >
-                    <div className="mb-1 text-[10px] text-zinc-500">{s.label}</div>
-                    <div className="text-xl font-bold text-zinc-100">{s.val}</div>
+                    <div className={`h-3 w-3 rounded-sm ${i === 0 ? "bg-emerald-500/60" : "bg-zinc-800"}`} />
+                    <div className="h-2 rounded bg-zinc-800" style={{ width: `${item.length * 5}px` }} />
                   </div>
                 ))}
               </div>
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-                <div className="mb-3 h-2.5 w-28 rounded bg-zinc-800" />
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 border-t border-zinc-800 py-2.5">
-                    <div className="h-7 w-7 rounded-full bg-emerald-500/20" />
-                    <div>
-                      <div className="h-2.5 w-24 rounded bg-zinc-800" />
-                      <div className="mt-1 h-2 w-16 rounded bg-zinc-800/60" />
+              <div>
+                <div className="mb-1.5 h-1.5 w-12 rounded bg-zinc-800/60" />
+                {["Services", "Staff", "Analytics", "Settings"].map((item) => (
+                  <div key={item} className="mb-1 flex items-center gap-2 px-2 py-1.5">
+                    <div className="h-3 w-3 rounded-sm bg-zinc-800" />
+                    <div className="h-2 rounded bg-zinc-800" style={{ width: `${item.length * 5}px` }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Main */}
+            <div className="flex-1 bg-zinc-950 p-5">
+              {/* Stats row */}
+              <div className="mb-4 grid grid-cols-3 gap-3">
+                {[
+                  { label: "Today", val: "12", sub: "bookings", accent: "emerald" },
+                  { label: "Revenue", val: "$1,840", sub: "this week", accent: "violet" },
+                  { label: "Clients", val: "48", sub: "active", accent: "blue" },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="rounded-xl border border-zinc-800/80 bg-zinc-900 p-3.5"
+                  >
+                    <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">
+                      {s.label}
+                    </p>
+                    <p className="text-lg font-bold text-zinc-100">{s.val}</p>
+                    <p className="text-[9px] text-zinc-600">{s.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bookings table */}
+              <div className="rounded-xl border border-zinc-800/80 bg-zinc-900">
+                <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-3">
+                  <div className="h-2.5 w-24 rounded-md bg-zinc-800" />
+                  <div className="h-5 w-16 rounded-lg bg-emerald-500/20" />
+                </div>
+                {[
+                  { status: "confirmed", width: 20 },
+                  { status: "pending", width: 16 },
+                  { status: "confirmed", width: 24 },
+                  { status: "completed", width: 18 },
+                ].map((row, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 border-t border-zinc-800/40 px-4 py-3"
+                  >
+                    <div className="h-6 w-6 rounded-full bg-zinc-800" />
+                    <div className="flex-1">
+                      <div className="mb-1 h-2 w-20 rounded bg-zinc-800" />
+                      <div className="h-1.5 w-14 rounded bg-zinc-800/60" />
                     </div>
-                    <div className="ml-auto h-5 w-16 rounded-full bg-emerald-500/20" />
+                    <div
+                      className={`h-4 w-${row.width === 20 ? "20" : row.width === 16 ? "16" : row.width === 24 ? "24" : "18"} rounded-full ${
+                        row.status === "confirmed"
+                          ? "bg-emerald-500/20"
+                          : row.status === "pending"
+                          ? "bg-amber-500/20"
+                          : "bg-blue-500/20"
+                      }`}
+                    />
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-zinc-950 to-transparent" />
+
+        {/* Bottom gradient fade */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-zinc-950 to-transparent" />
       </div>
     </section>
   );

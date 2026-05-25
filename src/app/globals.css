@@ -149,3 +149,53 @@
   backdrop-filter: blur(12px);
   border: 1px solid oklch(1 0 0 / 8%);
 }
+
+/* ─── Hero dot-grid background ───────────────────────── */
+.hero-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    oklch(1 0 0 / 0.06) 1px,
+    transparent 0
+  );
+  background-size: 28px 28px;
+}
+
+/* ─── Gradient border card ───────────────────────────── */
+.gradient-border {
+  position: relative;
+  background: oklch(0.135 0 0);
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    oklch(0.696 0.17 162.48 / 0.5),
+    oklch(1 0 0 / 0.08),
+    oklch(0.696 0.17 162.48 / 0.2)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Emerald gradient text variant ─────────────────── */
+.gradient-text-emerald {
+  background: linear-gradient(
+    to right,
+    oklch(0.792 0.18 162.48),
+    oklch(0.696 0.17 162.48)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
