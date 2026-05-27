@@ -18,18 +18,31 @@ export default async function BookingsPage() {
   });
 
   let bookings: BookingWithRelations[] = [];
+  let paymentMethods: {
+    id: string;
+    type: string;
+    label: string;
+  }[] = [];
 
   if (business) {
-    const raw = await prisma.booking.findMany({
-      where: { business_id: business.id },
-      orderBy: { starts_at: "desc" },
-      take: 100,
-      include: {
-        service: { select: { name: true, duration: true, price: true, color: true } },
-        staff: { select: { full_name: true, avatar_url: true } },
-      },
-    });
+    const [raw, rawMethods] = await Promise.all([
+      prisma.booking.findMany({
+        where: { business_id: business.id },
+        orderBy: { starts_at: "desc" },
+        take: 100,
+        include: {
+          service: { select: { name: true, duration: true, price: true, color: true } },
+          staff: { select: { full_name: true, avatar_url: true } },
+        },
+      }),
+      prisma.paymentMethod.findMany({
+        where: { business_id: business.id, is_enabled: true },
+        orderBy: { sort_order: "asc" },
+        select: { id: true, type: true, label: true },
+      }),
+    ]);
     bookings = serialize(raw) as unknown as BookingWithRelations[];
+    paymentMethods = serialize(rawMethods) as typeof paymentMethods;
   }
 
   return (
@@ -40,7 +53,7 @@ export default async function BookingsPage() {
           Manage and track all your appointments.
         </p>
       </div>
-      <BookingsTable bookings={bookings} />
+      <BookingsTable bookings={bookings} paymentMethods={paymentMethods} />
     </div>
   );
 }

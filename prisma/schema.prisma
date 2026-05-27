@@ -41,6 +41,7 @@ model Business {
   notifications   Notification[]
   audit_logs      AuditLog[]
   payment_methods PaymentMethod[]
+  subscription_payments SubscriptionPayment[]
 
   @@map("businesses")
 }
@@ -136,6 +137,8 @@ model Booking {
   customer_name  String
   customer_email String
   customer_phone String?
+  payment_method_id String?  @db.Uuid
+  payment_proof_url String?
   starts_at      DateTime @db.Timestamptz(6)
   ends_at        DateTime @db.Timestamptz(6)
   status         String   @default("pending")
@@ -168,7 +171,7 @@ model Notification {
 model PaymentMethod {
   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   business_id String   @db.Uuid
-  type        String   // stripe | gcash | maya | wise | bank_transfer
+  type        String   // stripe | gcash | maya | wise | bank_transfer | cash
   label       String
   is_enabled  Boolean  @default(true)
   details     Json?    // type-specific config: account numbers, keys, links, etc.
@@ -179,6 +182,20 @@ model PaymentMethod {
   business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
 
   @@map("payment_methods")
+}
+
+model SubscriptionPayment {
+  id                  String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  business_id         String   @db.Uuid
+  payment_method_type String
+  payment_proof_url   String
+  status              String   @default("pending")
+  notes               String?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("subscription_payments")
 }
 
 model HomepageConfig {

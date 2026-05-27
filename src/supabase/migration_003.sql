@@ -41,7 +41,23 @@ create policy "superadmin manage homepage"
 create index if not exists homepage_config_order_idx
   on public.homepage_config (order_index, is_active);
 
--- 5. Default sections (safe to re-run — only inserts if section not present)
+-- 5. Default sections (safe to re-run - only inserts if section not present)
+insert into public.homepage_config (section_key, order_index, is_active, content)
+select 'header', -1, true, '{
+  "brand_text": "Book",
+  "brand_highlight": "Easy",
+  "nav_links": [
+    {"label": "Features", "href": "#features"},
+    {"label": "Pricing", "href": "#pricing"},
+    {"label": "Demo", "href": "/glow-beauty-studio"}
+  ],
+  "sign_in_text": "Sign in",
+  "sign_in_href": "/login",
+  "primary_cta_text": "Get started",
+  "primary_cta_href": "/register"
+}'::jsonb
+where not exists (select 1 from public.homepage_config where section_key = 'header');
+
 insert into public.homepage_config (section_key, order_index, is_active, content)
 select 'hero', 0, true, '{
   "badge": "Now in public beta",
@@ -52,7 +68,22 @@ select 'hero', 0, true, '{
   "primary_cta_href": "/register",
   "secondary_cta_text": "See a live demo",
   "secondary_cta_href": "/glow-beauty-studio",
-  "trust_line": "No credit card required · Trusted by 500+ businesses"
+  "trust_line": "No credit card required - Trusted by 500+ businesses",
+  "trust_note": "No credit card required",
+  "avatar_initials": ["JL", "MR", "SK", "AT", "CM"],
+  "mockup_url": "app.bookeasy.com/dashboard",
+  "mockup_notification_title": "12 new bookings",
+  "mockup_notification_subtitle": "Today - Updated now",
+  "mockup_revenue_title": "$1,840 this week",
+  "mockup_revenue_subtitle": "+14% vs last week",
+  "mockup_sidebar_primary": ["Dashboard", "Bookings", "Calendar"],
+  "mockup_sidebar_secondary": ["Services", "Staff", "Analytics", "Settings"],
+  "mockup_stats": [
+    {"label": "Today", "value": "12", "sub": "bookings"},
+    {"label": "Revenue", "value": "$1,840", "sub": "this week"},
+    {"label": "Clients", "value": "48", "sub": "active"}
+  ],
+  "mockup_statuses": ["confirmed", "pending", "confirmed", "completed"]
 }'::jsonb
 where not exists (select 1 from public.homepage_config where section_key = 'hero');
 
@@ -72,7 +103,7 @@ select 'social_proof', 1, true, '{
       "initials": "JL"
     },
     {
-      "quote": "Set up in 5 minutes. Our clients book online 24/7 now — no more phone tag.",
+      "quote": "Set up in 5 minutes. Our clients book online 24/7 now - no more phone tag.",
       "author": "Marcus Reid",
       "role": "Owner, FitZone Performance",
       "initials": "MR"
@@ -107,3 +138,45 @@ select 'cta', 3, true, '{
   "trust_items": ["No credit card required", "Cancel any time", "Free plan available"]
 }'::jsonb
 where not exists (select 1 from public.homepage_config where section_key = 'cta');
+
+insert into public.homepage_config (section_key, order_index, is_active, content)
+select 'footer', 99, true, '{
+  "brand_text": "Book",
+  "brand_highlight": "Easy",
+  "description": "The all-in-one booking platform for service businesses. Set up in minutes, loved by thousands.",
+  "social_links": [
+    {"label": "X", "href": "#"},
+    {"label": "GitHub", "href": "#"}
+  ],
+  "columns": [
+    {
+      "heading": "Product",
+      "links": [
+        {"label": "Features", "href": "#features"},
+        {"label": "Pricing", "href": "#pricing"},
+        {"label": "Demo", "href": "/glow-beauty-studio"},
+        {"label": "Changelog", "href": "#"}
+      ]
+    },
+    {
+      "heading": "Company",
+      "links": [
+        {"label": "About", "href": "#"},
+        {"label": "Blog", "href": "#"},
+        {"label": "Careers", "href": "#"},
+        {"label": "Contact", "href": "#"}
+      ]
+    },
+    {
+      "heading": "Legal",
+      "links": [
+        {"label": "Privacy", "href": "#"},
+        {"label": "Terms", "href": "#"},
+        {"label": "Security", "href": "#"}
+      ]
+    }
+  ],
+  "copyright_text": "BookEasy. All rights reserved.",
+  "bottom_note": "Built for service businesses worldwide"
+}'::jsonb
+where not exists (select 1 from public.homepage_config where section_key = 'footer');

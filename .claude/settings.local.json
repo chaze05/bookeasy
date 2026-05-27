@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(node -e \"const r = require\\('c:/escapegoat/booking-web-app/node_modules/radix-ui'\\); const dd = r.DropdownMenu; console.log\\(typeof dd.Root, typeof dd.Content, typeof dd.Item\\)\")",
-      "Bash(node -e \"const r = require\\('c:/escapegoat/booking-web-app/node_modules/radix-ui'\\); const av = r.Avatar; console.log\\(Object.keys\\(av\\)\\)\")"
+      "Bash(node -e \"const r = require\\('c:/escapegoat/booking-web-app/node_modules/radix-ui'\\); const av = r.Avatar; console.log\\(Object.keys\\(av\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(mkdir -p \"c:/escapegoat/booking-web-app/src/app/[slug]\")",
+      "Bash(cp \"c:/escapegoat/booking-web-app/src/app/\\(slug\\)/booking-widget.tsx\" \"c:/escapegoat/booking-web-app/src/app/[slug]/booking-widget.tsx\")",
+      "Bash(ls \"c:/escapegoat/\" 2>/dev/null | head -20)",
+      "Read(//c/escapegoat/**)",
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\escapegoat\\\\booking-web-app\\\\src\\\\app\\\\\\(slug\\)\")",
+      "Bash(dir \"c:\\\\escapegoat\\\\booking-web-app\\\\src\\\\supabase\")",
+      "Bash(dir \"c:\\\\escapegoat\\\\booking-web-app\\\\src\\\\app\\\\superadmin\" /s /b)",
+      "Bash(findstr \"page.tsx\")"
+    ],
+    "additionalDirectories": [
+      "c:\\escapegoat\\booking-web-app\\src\\app",
+      "c:\\escapegoat\\booking-web-app\\src\\app\\[slug]"
     ]
   }
 }

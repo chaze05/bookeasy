@@ -1,8 +1,9 @@
-import { CreditCard, Smartphone, Globe, Landmark, CreditCard as CardIcon } from "lucide-react";
+import { CreditCard, Smartphone, Globe, Landmark, CreditCard as CardIcon, Banknote } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import { Badge } from "@/components/ui/badge";
 import { PaymentTypeToggle } from "@/components/superadmin/payment-type-toggle";
+import { PaymentMethodEditor } from "./payment-method-editor";
 
 export const metadata = { title: "Payments — Superadmin" };
 
@@ -39,6 +40,12 @@ const GATEWAY_META: Record<
     icon: Globe,
     color: "#9FE870",
     description: "International bank transfers at real exchange rates.",
+  },
+  cash: {
+    label: "Cash",
+    icon: Banknote,
+    color: "#22C55E",
+    description: "Pay in person when service is completed.",
   },
 };
 
@@ -152,9 +159,17 @@ export default async function SuperadminPaymentsPage() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={m.is_enabled ? "success" : "outline"} className="text-xs">
-                    {m.is_enabled ? "Enabled" : "Disabled"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={m.is_enabled ? "success" : "outline"} className="text-xs">
+                      {m.is_enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                    <PaymentMethodEditor
+                      method={{
+                        ...m,
+                        details: (m.details ?? null) as Record<string, string> | null,
+                      }}
+                    />
+                  </div>
                 </div>
               );
             })}

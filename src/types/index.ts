@@ -112,6 +112,8 @@ export interface Booking {
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;
+  payment_method_id: string | null;
+  payment_proof_url: string | null;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;

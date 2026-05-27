@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\escapegoat\\\\booking-web-app\\\\src\\\\app\\\\superadmin\" -Recurse -Filter \"page.tsx\")",
+      "Bash(Select-Object FullName)",
+      "Bash(npx prisma *)",
+      "Bash(node -e \"const {PrismaClient} = require\\('./src/generated/prisma'\\); const p = new PrismaClient\\(\\); console.log\\('paymentMethod' in p\\);\")",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

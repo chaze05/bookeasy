@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { uploadPaymentProof } from "@/actions/payments";
 import type { BookingStatus } from "@/types";
 
 export async function getAvailableSlots(
@@ -83,6 +84,8 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   const customerEmail = (formData.get("customerEmail") as string)?.trim();
   const customerPhone = (formData.get("customerPhone") as string)?.trim() || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
+  const paymentMethodId = (formData.get("paymentMethodId") as string)?.trim() || null;
+  const paymentProof = formData.get("paymentProof");
 
   if (!businessId || !serviceId || !dateStr || !timeStr || !customerName || !customerEmail) {
     throw new Error("Please fill in all required fields.");
@@ -91,7 +94,7 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
     throw new Error("Invalid email address.");
   }
 
-  const [business, service] = await Promise.all([
+  const [business, service, enabledPaymentMethods] = await Promise.all([
     prisma.business.findUnique({
       where: { id: businessId, status: "active" },
       select: { max_bookings_per_slot: true },
@@ -100,9 +103,24 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       where: { id: serviceId, business_id: businessId, is_active: true },
       select: { duration: true },
     }),
+    prisma.paymentMethod.findMany({
+      where: { business_id: businessId, is_enabled: true },
+      select: { id: true, type: true },
+    }),
   ]);
   if (!business) throw new Error("Business not found.");
   if (!service) throw new Error("Service not found.");
+
+  const selectedPaymentMethod = enabledPaymentMethods.find((method) => method.id === paymentMethodId);
+  const requiresPaymentProof = Boolean(selectedPaymentMethod && selectedPaymentMethod.type !== "cash");
+  const validPaymentMethodIds = new Set(enabledPaymentMethods.map((method) => method.id));
+
+  if (enabledPaymentMethods.length > 0 && (!paymentMethodId || !validPaymentMethodIds.has(paymentMethodId))) {
+    throw new Error("Please choose a payment method.");
+  }
+  if (requiresPaymentProof && !(paymentProof instanceof File)) {
+    throw new Error("Please upload a payment proof image.");
+  }
 
   const [year, month, day] = dateStr.split("-").map(Number);
   const [hour, minute] = timeStr.split(":").map(Number);
@@ -118,13 +136,22 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
     throw new Error("This slot is no longer available. Please choose another time.");
   }
 
+  const bookingId = crypto.randomUUID();
+  const paymentProofUrl =
+    requiresPaymentProof && paymentProof instanceof File
+      ? await uploadPaymentProof(bookingId, paymentProof)
+      : null;
+
   await prisma.booking.create({
     data: {
+      id: bookingId,
       business_id: businessId,
       service_id: serviceId,
       customer_name: customerName,
       customer_email: customerEmail,
       customer_phone: customerPhone,
+      payment_method_id: requiresPaymentProof ? paymentMethodId : null,
+      payment_proof_url: paymentProofUrl,
       notes,
       starts_at: startsAt,
       ends_at: endsAt,
@@ -148,6 +175,67 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
   const result = await prisma.booking.updateMany({
     where: { id, business_id: business.id },
     data: { status, updated_at: new Date() },
+  });
+  if (result.count === 0) throw new Error("Booking not found");
+
+  revalidatePath("/dashboard/bookings");
+  revalidatePath("/dashboard");
+}
+
+export async function completeBookingWithPayment(formData: FormData) {
+  const bookingId = String(formData.get("bookingId") ?? "");
+  const paymentMethodId = String(formData.get("paymentMethodId") ?? "");
+  const paymentNotes = String(formData.get("paymentNotes") ?? "").trim();
+  const proof = formData.get("paymentProof");
+
+  if (!bookingId) throw new Error("Booking is required");
+  if (!paymentMethodId) throw new Error("Please select how payment was received.");
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const business = await prisma.business.findFirst({
+    where: { owner_id: user.id },
+    select: { id: true },
+  });
+  if (!business) throw new Error("No business found");
+
+  const method = await prisma.paymentMethod.findFirst({
+    where: { id: paymentMethodId, business_id: business.id, is_enabled: true },
+    select: { id: true, type: true },
+  });
+  if (!method) throw new Error("Payment method not found");
+
+  const requiresProof = method.type !== "cash";
+  if (requiresProof && (!(proof instanceof File) || proof.size === 0)) {
+    throw new Error("Please upload proof of payment.");
+  }
+
+  const paymentProofUrl =
+    proof instanceof File && proof.size > 0
+      ? await uploadPaymentProof(bookingId, proof)
+      : null;
+
+  const existingBooking = await prisma.booking.findFirst({
+    where: { id: bookingId, business_id: business.id },
+    select: { notes: true },
+  });
+  if (!existingBooking) throw new Error("Booking not found");
+
+  const notes = paymentNotes
+    ? [existingBooking.notes, `Payment note: ${paymentNotes}`].filter(Boolean).join("\n")
+    : existingBooking.notes;
+
+  const result = await prisma.booking.updateMany({
+    where: { id: bookingId, business_id: business.id },
+    data: {
+      status: "completed",
+      payment_method_id: method.id,
+      payment_proof_url: paymentProofUrl,
+      notes,
+      updated_at: new Date(),
+    },
   });
   if (result.count === 0) throw new Error("Booking not found");
 

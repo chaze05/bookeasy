@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +12,9 @@ import {
   CalendarCheck,
   BarChart3,
   Scissors,
+  FileBarChart,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,6 +56,11 @@ const navItems = [
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart3,
+  },
+  {
+    label: "Reports",
+    href: "/dashboard/reports",
+    icon: FileBarChart,
   },
 ];
 
@@ -129,25 +138,27 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed = false }: SidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(collapsed);
+
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "flex h-full flex-col border-r border-zinc-800 bg-zinc-950",
-          collapsed ? "w-14" : "w-60"
+          "flex h-full flex-col border-r border-zinc-800 bg-zinc-950 transition-[width]",
+          isCollapsed ? "w-14" : "w-60"
         )}
       >
         {/* Logo */}
         <div
           className={cn(
             "flex h-14 items-center border-b border-zinc-800",
-            collapsed ? "justify-center px-2" : "gap-2.5 px-4"
+            isCollapsed ? "justify-center px-2" : "gap-2.5 px-4"
           )}
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500">
             <CalendarCheck className="h-4 w-4 text-white" />
           </div>
-          {!collapsed && (
+          {!isCollapsed && (
             <span className="text-sm font-semibold text-zinc-100">
               BookEasy
             </span>
@@ -161,7 +172,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               <SidebarLink
                 key={item.href}
                 {...item}
-                collapsed={collapsed}
+                collapsed={isCollapsed}
               />
             ))}
           </nav>
@@ -174,10 +185,21 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               <SidebarLink
                 key={item.href}
                 {...item}
-                collapsed={collapsed}
+                collapsed={isCollapsed}
               />
             ))}
           </nav>
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((value) => !value)}
+            className={cn(
+              "mt-3 flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100",
+              isCollapsed ? "justify-center px-2" : "gap-3"
+            )}
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            {!isCollapsed && <span>Collapse</span>}
+          </button>
         </div>
       </aside>
     </TooltipProvider>

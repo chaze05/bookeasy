@@ -11,6 +11,17 @@ interface HeroContent {
   secondary_cta_text?: string;
   secondary_cta_href?: string;
   trust_line?: string;
+  trust_note?: string;
+  avatar_initials?: string[];
+  mockup_url?: string;
+  mockup_notification_title?: string;
+  mockup_notification_subtitle?: string;
+  mockup_revenue_title?: string;
+  mockup_revenue_subtitle?: string;
+  mockup_sidebar_primary?: string[];
+  mockup_sidebar_secondary?: string[];
+  mockup_stats?: Array<{ label: string; value: string; sub: string }>;
+  mockup_statuses?: string[];
 }
 
 const AVATARS = [
@@ -23,6 +34,15 @@ const AVATARS = [
 
 export function HeroSection({ content }: { content: unknown }) {
   const c = (content ?? {}) as HeroContent;
+  const avatarInitials = c.avatar_initials ?? ["JL", "MR", "SK", "AT", "CM"];
+  const sidebarPrimary = c.mockup_sidebar_primary ?? ["Dashboard", "Bookings", "Calendar"];
+  const sidebarSecondary = c.mockup_sidebar_secondary ?? ["Services", "Staff", "Analytics", "Settings"];
+  const mockupStats = c.mockup_stats ?? [
+    { label: "Today", value: "12", sub: "bookings" },
+    { label: "Revenue", value: "$1,840", sub: "this week" },
+    { label: "Clients", value: "48", sub: "active" },
+  ];
+  const mockupStatuses = c.mockup_statuses ?? ["confirmed", "pending", "confirmed", "completed"];
 
   return (
     <section className="hero-grid-bg relative isolate overflow-hidden px-4 pb-16 pt-24 sm:px-6 sm:pt-32">
@@ -84,12 +104,12 @@ export function HeroSection({ content }: { content: unknown }) {
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-5">
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2.5">
-              {AVATARS.map((a) => (
+              {avatarInitials.map((initials, i) => (
                 <div
-                  key={a.initials}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-zinc-950 text-[10px] font-bold text-white ${a.bg}`}
+                  key={`${initials}-${i}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-zinc-950 text-[10px] font-bold text-white ${AVATARS[i % AVATARS.length].bg}`}
                 >
-                  {a.initials}
+                  {initials}
                 </div>
               ))}
             </div>
@@ -108,7 +128,7 @@ export function HeroSection({ content }: { content: unknown }) {
           <div className="hidden h-4 w-px bg-zinc-800 sm:block" />
 
           <p className="text-[11px] text-zinc-500">
-            No credit card required
+            {c.trust_note ?? "No credit card required"}
           </p>
         </div>
       </div>
@@ -122,8 +142,12 @@ export function HeroSection({ content }: { content: unknown }) {
               <Bell className="h-4 w-4 text-emerald-400" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-100">12 new bookings</p>
-              <p className="text-[10px] text-zinc-500">Today · Updated now</p>
+              <p className="text-xs font-semibold text-zinc-100">
+                {c.mockup_notification_title ?? "12 new bookings"}
+              </p>
+              <p className="text-[10px] text-zinc-500">
+                {c.mockup_notification_subtitle ?? "Today - Updated now"}
+              </p>
             </div>
           </div>
         </div>
@@ -135,8 +159,12 @@ export function HeroSection({ content }: { content: unknown }) {
               <TrendingUp className="h-4 w-4 text-violet-400" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-100">$1,840 this week</p>
-              <p className="text-[10px] text-emerald-400">↑ 14% vs last week</p>
+              <p className="text-xs font-semibold text-zinc-100">
+                {c.mockup_revenue_title ?? "$1,840 this week"}
+              </p>
+              <p className="text-[10px] text-emerald-400">
+                {c.mockup_revenue_subtitle ?? "+14% vs last week"}
+              </p>
             </div>
           </div>
         </div>
@@ -152,7 +180,9 @@ export function HeroSection({ content }: { content: unknown }) {
             </div>
             <div className="mx-auto flex h-5 w-56 items-center justify-center gap-1.5 rounded-md bg-zinc-800/80 px-3">
               <span className="h-2 w-2 rounded-full bg-emerald-500/60" />
-              <span className="text-[10px] text-zinc-500">app.bookeasy.com/dashboard</span>
+              <span className="text-[10px] text-zinc-500">
+                {c.mockup_url ?? "app.bookeasy.com/dashboard"}
+              </span>
             </div>
           </div>
 
@@ -168,7 +198,7 @@ export function HeroSection({ content }: { content: unknown }) {
               </div>
               <div className="mb-3">
                 <div className="mb-1.5 h-1.5 w-10 rounded bg-zinc-800/60" />
-                {["Dashboard", "Bookings", "Calendar"].map((item, i) => (
+                {sidebarPrimary.map((item, i) => (
                   <div
                     key={item}
                     className={`mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5 ${i === 0 ? "bg-zinc-800/60" : ""}`}
@@ -180,7 +210,7 @@ export function HeroSection({ content }: { content: unknown }) {
               </div>
               <div>
                 <div className="mb-1.5 h-1.5 w-12 rounded bg-zinc-800/60" />
-                {["Services", "Staff", "Analytics", "Settings"].map((item) => (
+                {sidebarSecondary.map((item) => (
                   <div key={item} className="mb-1 flex items-center gap-2 px-2 py-1.5">
                     <div className="h-3 w-3 rounded-sm bg-zinc-800" />
                     <div className="h-2 rounded bg-zinc-800" style={{ width: `${item.length * 5}px` }} />
@@ -193,11 +223,7 @@ export function HeroSection({ content }: { content: unknown }) {
             <div className="flex-1 bg-zinc-950 p-5">
               {/* Stats row */}
               <div className="mb-4 grid grid-cols-3 gap-3">
-                {[
-                  { label: "Today", val: "12", sub: "bookings", accent: "emerald" },
-                  { label: "Revenue", val: "$1,840", sub: "this week", accent: "violet" },
-                  { label: "Clients", val: "48", sub: "active", accent: "blue" },
-                ].map((s) => (
+                {mockupStats.map((s) => (
                   <div
                     key={s.label}
                     className="rounded-xl border border-zinc-800/80 bg-zinc-900 p-3.5"
@@ -205,7 +231,7 @@ export function HeroSection({ content }: { content: unknown }) {
                     <p className="mb-1 text-[9px] uppercase tracking-wider text-zinc-600">
                       {s.label}
                     </p>
-                    <p className="text-lg font-bold text-zinc-100">{s.val}</p>
+                    <p className="text-lg font-bold text-zinc-100">{s.value}</p>
                     <p className="text-[9px] text-zinc-600">{s.sub}</p>
                   </div>
                 ))}
@@ -217,12 +243,7 @@ export function HeroSection({ content }: { content: unknown }) {
                   <div className="h-2.5 w-24 rounded-md bg-zinc-800" />
                   <div className="h-5 w-16 rounded-lg bg-emerald-500/20" />
                 </div>
-                {[
-                  { status: "confirmed", width: 20 },
-                  { status: "pending", width: 16 },
-                  { status: "confirmed", width: 24 },
-                  { status: "completed", width: 18 },
-                ].map((row, i) => (
+                {mockupStatuses.map((status, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-3 border-t border-zinc-800/40 px-4 py-3"
@@ -233,13 +254,14 @@ export function HeroSection({ content }: { content: unknown }) {
                       <div className="h-1.5 w-14 rounded bg-zinc-800/60" />
                     </div>
                     <div
-                      className={`h-4 w-${row.width === 20 ? "20" : row.width === 16 ? "16" : row.width === 24 ? "24" : "18"} rounded-full ${
-                        row.status === "confirmed"
+                      className={`h-4 rounded-full ${
+                        status === "confirmed"
                           ? "bg-emerald-500/20"
-                          : row.status === "pending"
+                          : status === "pending"
                           ? "bg-amber-500/20"
                           : "bg-blue-500/20"
                       }`}
+                      style={{ width: `${Math.max(64, status.length * 10)}px` }}
                     />
                   </div>
                 ))}

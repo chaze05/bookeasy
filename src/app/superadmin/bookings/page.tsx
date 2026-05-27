@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { CalendarCheck, Clock } from "lucide-react";
+import { CalendarCheck, Clock, ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +93,7 @@ export default async function SuperadminBookingsPage() {
                 <TableHead>Service</TableHead>
                 <TableHead>Date & Time</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Proof</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
               </TableRow>
             </TableHeader>
@@ -125,6 +126,21 @@ export default async function SuperadminBookingsPage() {
                     <Badge variant={STATUS_VARIANT[b.status] ?? "outline"}>
                       {b.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {b.payment_proof_url ? (
+                      <a
+                        href={b.payment_proof_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                      >
+                        <ReceiptText className="h-3.5 w-3.5" />
+                        View
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-600">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right text-sm font-medium text-zinc-200">
                     ${Number(b.service.price).toFixed(2)}

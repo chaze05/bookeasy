@@ -19,6 +19,9 @@ import {
   Landmark,
   Copy,
   Check,
+  Upload,
+  ExternalLink,
+  Banknote,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -59,6 +62,7 @@ const PAYMENT_ICONS: Record<string, React.ElementType> = {
   maya: Smartphone,
   wise: Globe,
   bank_transfer: Landmark,
+  cash: Banknote,
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -67,6 +71,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   maya: "#00C896",
   wise: "#9FE870",
   bank_transfer: "#F59E0B",
+  cash: "#22C55E",
 };
 
 function fmtTime(t: string) {
@@ -118,6 +123,7 @@ export function BookingWidget({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -128,6 +134,7 @@ export function BookingWidget({
     setSelectedSlot("");
     setForm({ name: "", email: "", phone: "", notes: "" });
     setSelectedPaymentType(paymentMethods[0]?.type ?? null);
+    setPaymentProof(null);
   }
 
   function handleOpenChange(v: boolean) {
@@ -148,7 +155,7 @@ export function BookingWidget({
     }
   }
 
-  function handleSubmit() {
+  function submitBooking(proof: File | null) {
     startTransition(async () => {
       const fd = new FormData();
       fd.append("businessId", business.id);
@@ -159,20 +166,39 @@ export function BookingWidget({
       fd.append("customerEmail", form.email);
       fd.append("customerPhone", form.phone);
       fd.append("notes", form.notes);
+      if (activePaymentMethod) fd.append("paymentMethodId", activePaymentMethod.id);
+      if (proof) fd.append("paymentProof", proof);
       try {
         await createPublicBooking(fd);
-        setStep(hasPayment ? 4 : 3);
+        setStep(3);
       } catch (e) {
         alert(e instanceof Error ? e.message : "Something went wrong");
       }
     });
   }
 
-  // Steps: 1=Date/Time, 2=Details, 3=Success (no payment), 4=Payment
+  function handleSubmit() {
+    if (hasPayment) {
+      setStep(4);
+      return;
+    }
+    submitBooking(null);
+  }
+
+  function handlePaymentSubmit() {
+    if (activePaymentRequiresProof && !paymentProof) {
+      alert("Please upload a payment proof image.");
+      return;
+    }
+    submitBooking(paymentProof);
+  }
+
+  // Steps: 1=Date/Time, 2=Details, 3=Success, 4=Payment
   const stepLabels = ["Date & Time", "Your Details"];
   const isFinalSuccess = step === 3 || step === 4;
 
   const activePaymentMethod = paymentMethods.find((m) => m.type === selectedPaymentType);
+  const activePaymentRequiresProof = Boolean(activePaymentMethod && activePaymentMethod.type !== "cash");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -362,7 +388,7 @@ export function BookingWidget({
                     disabled={isPending || !form.name || !form.email}
                     className="h-11 flex-1 bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-30"
                   >
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Booking"}
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : hasPayment ? "Continue to Payment" : "Confirm Booking"}
                   </Button>
                 </div>
               </motion.div>
@@ -419,11 +445,11 @@ export function BookingWidget({
                 transition={{ duration: 0.18 }}
                 className="flex flex-col gap-5"
               >
-                {/* Booking confirmed banner */}
+                {/* Payment prompt */}
                 <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                  <CreditCard className="h-4 w-4 shrink-0 text-emerald-400" />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-emerald-300">Booking confirmed!</p>
+                    <p className="text-sm font-semibold text-emerald-300">Pay to confirm your booking</p>
                     <p className="text-xs text-zinc-500">
                       {service.name} · {date && format(new Date(date + "T00:00:00"), "MMM d")} at {fmtTime(selectedSlot)}
                     </p>
@@ -475,19 +501,50 @@ export function BookingWidget({
                   >
                     {activePaymentMethod.details && Object.keys(activePaymentMethod.details).length > 0 ? (
                       <div className="flex flex-col gap-2.5">
-                        {Object.entries(activePaymentMethod.details).map(([key, value]) => (
-                          value ? (
+                        {Object.entries(activePaymentMethod.details).map(([key, value]) => {
+                          if (!value) return null;
+                          const isImage = key.includes("qr") || /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(value);
+                          const isLink = /^https?:\/\//i.test(value);
+
+                          if (isImage) {
+                            return (
+                              <div key={key} className="flex flex-col gap-2">
+                                <p className="text-xs capitalize text-zinc-500">
+                                  {key.replace(/_/g, " ")}
+                                </p>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={value}
+                                  alt={`${activePaymentMethod.label} QR code`}
+                                  className="mx-auto max-h-56 rounded-lg border border-zinc-800 bg-white object-contain p-2"
+                                />
+                              </div>
+                            );
+                          }
+
+                          return (
                             <div key={key} className="flex items-center justify-between gap-4">
                               <p className="text-xs capitalize text-zinc-500">
                                 {key.replace(/_/g, " ")}
                               </p>
                               <div className="flex items-center">
-                                <p className="text-sm font-medium text-zinc-200 text-right">{value}</p>
+                                {isLink ? (
+                                  <a
+                                    href={value}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-sm font-medium text-emerald-400 hover:text-emerald-300"
+                                  >
+                                    Open link <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : (
+                                  <p className="text-right text-sm font-medium text-zinc-200">{value}</p>
+                                )}
                                 <CopyButton text={value} />
                               </div>
                             </div>
-                          ) : null
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-center text-xs text-zinc-500 py-3">
@@ -498,11 +555,27 @@ export function BookingWidget({
                 )}
 
                 <div className="flex flex-col gap-2">
+                  {activePaymentRequiresProof && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      <Upload className="h-3.5 w-3.5 text-emerald-500" />
+                      Upload payment proof <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setPaymentProof(e.target.files?.[0] ?? null)}
+                      className="border-zinc-700 bg-zinc-900 text-zinc-100 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-xs file:text-zinc-200"
+                    />
+                    <p className="text-[11px] text-zinc-600">Screenshot or photo, 5MB max.</p>
+                  </div>
+                  )}
                   <Button
-                    onClick={() => handleOpenChange(false)}
-                    className="w-full bg-emerald-500 text-white hover:bg-emerald-400"
+                    onClick={handlePaymentSubmit}
+                    disabled={isPending || (activePaymentRequiresProof && !paymentProof)}
+                    className="w-full bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-30"
                   >
-                    Done — I&apos;ll send payment
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : activePaymentRequiresProof ? "Submit payment proof" : "Confirm booking"}
                   </Button>
                   <button
                     onClick={reset}

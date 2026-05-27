@@ -22,17 +22,11 @@ function bust() {
   revalidatePath("/superadmin/homepage");
 }
 
-export async function updateSectionContent(id: string, contentJson: string) {
+export async function updateSectionContent(id: string, content: object) {
   await assertSuperadmin();
-  let content: unknown;
-  try {
-    content = JSON.parse(contentJson);
-  } catch {
-    throw new Error("Invalid JSON — please check your content and try again.");
-  }
   await prisma.homepageConfig.update({
     where: { id },
-    data: { content: content as object, updated_at: new Date() },
+    data: { content, updated_at: new Date() },
   });
   bust();
 }
@@ -56,8 +50,14 @@ export async function moveSectionUp(id: string) {
   const current = sections[idx];
   const above = sections[idx - 1];
   await Promise.all([
-    prisma.homepageConfig.update({ where: { id: current.id }, data: { order_index: above.order_index } }),
-    prisma.homepageConfig.update({ where: { id: above.id },   data: { order_index: current.order_index } }),
+    prisma.homepageConfig.update({
+      where: { id: current.id },
+      data: { order_index: above.order_index },
+    }),
+    prisma.homepageConfig.update({
+      where: { id: above.id },
+      data: { order_index: current.order_index },
+    }),
   ]);
   bust();
 }
@@ -72,8 +72,14 @@ export async function moveSectionDown(id: string) {
   const current = sections[idx];
   const below = sections[idx + 1];
   await Promise.all([
-    prisma.homepageConfig.update({ where: { id: current.id }, data: { order_index: below.order_index } }),
-    prisma.homepageConfig.update({ where: { id: below.id },   data: { order_index: current.order_index } }),
+    prisma.homepageConfig.update({
+      where: { id: current.id },
+      data: { order_index: below.order_index },
+    }),
+    prisma.homepageConfig.update({
+      where: { id: below.id },
+      data: { order_index: current.order_index },
+    }),
   ]);
   bust();
 }

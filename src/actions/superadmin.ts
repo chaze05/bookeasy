@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import type { UserRole, SuperadminStats, BusinessWithOwner, Profile } from "@/types";
+
+export type SuperadminUser = Profile & {
+  email: string | null;
+};
+
+const DEFAULT_RESET_PASSWORD = "password";
 
 async function assertSuperadmin() {
   const supabase = await createClient();
@@ -87,13 +94,53 @@ export async function getAllBusinesses(): Promise<BusinessWithOwner[]> {
   ) as unknown as BusinessWithOwner[];
 }
 
-export async function getAllUsers(): Promise<Profile[]> {
+export async function getAllUsers(): Promise<SuperadminUser[]> {
   await assertSuperadmin();
 
   const users = await prisma.profile.findMany({
     orderBy: { created_at: "desc" },
   });
-  return serialize(users) as unknown as Profile[];
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase admin credentials are not configured");
+  }
+
+  const supabaseAdmin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const authUsers = new Map<string, string | null>();
+  const perPage = 1000;
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) throw error;
+
+    for (const user of data.users) {
+      authUsers.set(user.id, user.email ?? null);
+    }
+
+    if (data.users.length < perPage) break;
+    page += 1;
+  }
+
+  return serialize(
+    users.map((user) => ({
+      ...user,
+      email: authUsers.get(user.id) ?? null,
+    }))
+  ) as unknown as SuperadminUser[];
 }
 
 export async function suspendBusiness(id: string) {
@@ -120,5 +167,38 @@ export async function updateUserRole(userId: string, role: UserRole) {
     where: { id: userId },
     data: { role, updated_at: new Date() },
   });
+  revalidatePath("/superadmin/users");
+}
+
+export async function resetUserPassword(userId: string) {
+  await assertSuperadmin();
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase admin credentials are not configured");
+  }
+
+  const user = await prisma.profile.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+
+  if (!user) throw new Error("User not found");
+
+  const supabaseAdmin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: DEFAULT_RESET_PASSWORD,
+  });
+
+  if (error) throw error;
+
   revalidatePath("/superadmin/users");
 }

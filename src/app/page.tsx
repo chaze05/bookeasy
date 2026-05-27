@@ -3,11 +3,23 @@ import { CalendarCheck, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import { HomepageRenderer, type HomepageSection } from "@/components/homepage/HomepageRenderer";
+import {
+  DEFAULT_FOOTER_CONTENT,
+  DEFAULT_HEADER_CONTENT,
+  getFooterContent,
+  getHeaderContent,
+  getPageSections,
+  type FooterContent,
+  type HeaderContent,
+} from "@/lib/homepage-content";
 
 export const revalidate = 300;
 
 export default async function HomePage() {
   let sections: HomepageSection[] = [];
+  let headerContent: HeaderContent = DEFAULT_HEADER_CONTENT;
+  let footerContent: FooterContent = DEFAULT_FOOTER_CONTENT;
+
   try {
     const raw = await prisma.homepageConfig.findMany({
       where: { is_active: true },
@@ -15,6 +27,9 @@ export default async function HomePage() {
       select: { id: true, section_key: true, content: true, order_index: true },
     });
     sections = serialize(raw) as HomepageSection[];
+    headerContent = getHeaderContent(sections);
+    footerContent = getFooterContent(sections);
+    sections = getPageSections(sections);
   } catch {
     // DB unreachable — HomepageRenderer falls back to static defaults
   }
@@ -31,17 +46,14 @@ export default async function HomePage() {
               <CalendarCheck className="h-4.5 w-4.5 text-white" />
             </div>
             <span className="text-sm font-semibold tracking-tight text-zinc-100">
-              Book<span className="text-emerald-400">Easy</span>
+              {headerContent.brand_text}
+              <span className="text-emerald-400">{headerContent.brand_highlight}</span>
             </span>
           </Link>
 
           {/* Nav links */}
           <nav className="hidden items-center gap-1 sm:flex">
-            {[
-              { label: "Features", href: "#features" },
-              { label: "Pricing", href: "#pricing" },
-              { label: "Demo", href: "/glow-beauty-studio" },
-            ].map((link) => (
+            {headerContent.nav_links.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}
@@ -55,16 +67,16 @@ export default async function HomePage() {
           {/* Auth actions */}
           <div className="flex items-center gap-2">
             <Link
-              href="/login"
+              href={headerContent.sign_in_href}
               className="hidden rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-100 sm:block"
             >
-              Sign in
+              {headerContent.sign_in_text}
             </Link>
             <Link
-              href="/register"
+              href={headerContent.primary_cta_href}
               className="group inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-px hover:bg-emerald-400 hover:shadow-emerald-400/30"
             >
-              Get started
+              {headerContent.primary_cta_text}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -88,16 +100,18 @@ export default async function HomePage() {
                   <CalendarCheck className="h-4 w-4 text-white" />
                 </div>
                 <span className="text-sm font-semibold text-zinc-100">
-                  Book<span className="text-emerald-400">Easy</span>
+                  {footerContent.brand_text}
+                  <span className="text-emerald-400">{footerContent.brand_highlight}</span>
                 </span>
               </Link>
               <p className="max-w-xs text-center text-xs leading-relaxed text-zinc-600 sm:text-left">
-                The all-in-one booking platform for service businesses. Set up in minutes, loved by thousands.
+                {footerContent.description}
               </p>
               <div className="flex items-center gap-3">
                 {/* X (Twitter) */}
                 <a
-                  href="#"
+                  href={footerContent.social_links[0]?.href ?? "#"}
+                  aria-label={footerContent.social_links[0]?.label ?? "X"}
                   className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-600 transition-colors hover:border-zinc-700 hover:text-zinc-400"
                 >
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current">
@@ -106,7 +120,8 @@ export default async function HomePage() {
                 </a>
                 {/* GitHub */}
                 <a
-                  href="#"
+                  href={footerContent.social_links[1]?.href ?? "#"}
+                  aria-label={footerContent.social_links[1]?.label ?? "GitHub"}
                   className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-600 transition-colors hover:border-zinc-700 hover:text-zinc-400"
                 >
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current">
@@ -118,34 +133,7 @@ export default async function HomePage() {
 
             {/* Links */}
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-              {[
-                {
-                  heading: "Product",
-                  links: [
-                    { label: "Features", href: "#features" },
-                    { label: "Pricing", href: "#pricing" },
-                    { label: "Demo", href: "/glow-beauty-studio" },
-                    { label: "Changelog", href: "#" },
-                  ],
-                },
-                {
-                  heading: "Company",
-                  links: [
-                    { label: "About", href: "#" },
-                    { label: "Blog", href: "#" },
-                    { label: "Careers", href: "#" },
-                    { label: "Contact", href: "#" },
-                  ],
-                },
-                {
-                  heading: "Legal",
-                  links: [
-                    { label: "Privacy", href: "#" },
-                    { label: "Terms", href: "#" },
-                    { label: "Security", href: "#" },
-                  ],
-                },
-              ].map((col) => (
+              {footerContent.columns.map((col) => (
                 <div key={col.heading}>
                   <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     {col.heading}
@@ -169,10 +157,10 @@ export default async function HomePage() {
 
           <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/5 pt-8 sm:flex-row">
             <p className="text-xs text-zinc-700">
-              © {new Date().getFullYear()} BookEasy. All rights reserved.
+              &copy; {new Date().getFullYear()} {footerContent.copyright_text}
             </p>
             <p className="text-xs text-zinc-700">
-              Built for service businesses worldwide
+              {footerContent.bottom_note}
             </p>
           </div>
         </div>

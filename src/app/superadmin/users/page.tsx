@@ -11,10 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ResetPasswordButton } from "./reset-password-button";
 import { UserRoleSelect } from "./user-role-select";
 import type { UserRole } from "@/types";
 
-export const metadata = { title: "Users — Superadmin" };
+export const metadata = { title: "Users - Superadmin" };
 
 const ROLE_VARIANT: Record<UserRole, "success" | "secondary" | "warning" | "outline"> = {
   superadmin: "warning",
@@ -57,9 +58,10 @@ export default async function SuperadminUsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Current Role</TableHead>
                 <TableHead>Joined</TableHead>
-                <TableHead className="text-right">Change Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -80,21 +82,28 @@ export default async function SuperadminUsersPage() {
                         <Avatar className="h-8 w-8">
                           {u.avatar_url && (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={u.avatar_url} alt="" className="h-full w-full object-cover rounded-full" />
+                            <img
+                              src={u.avatar_url}
+                              alt=""
+                              className="h-full w-full rounded-full object-cover"
+                            />
                           )}
-                          <AvatarFallback className="bg-zinc-700 text-zinc-300 text-xs">
+                          <AvatarFallback className="bg-zinc-700 text-xs text-zinc-300">
                             {initials}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="text-sm font-medium text-zinc-100">
-                            {u.full_name ?? "—"}
+                            {u.full_name ?? "-"}
                           </p>
                           {u.phone && (
                             <p className="text-xs text-zinc-500">{u.phone}</p>
                           )}
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-zinc-300">
+                      {u.email ?? "-"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={ROLE_VARIANT[u.role] ?? "outline"}>
@@ -105,10 +114,13 @@ export default async function SuperadminUsersPage() {
                       {format(new Date(u.created_at), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell className="text-right">
-                      <UserRoleSelect
-                        userId={u.id}
-                        currentRole={u.role}
-                      />
+                      <div className="flex justify-end gap-2">
+                        <UserRoleSelect userId={u.id} currentRole={u.role} />
+                        <ResetPasswordButton
+                          userId={u.id}
+                          userName={u.full_name ?? u.email ?? "this user"}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
