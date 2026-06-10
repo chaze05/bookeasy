@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { uploadPaymentProof } from "@/actions/payments";
+import { sendBookingReceivedEmail, sendBookingApprovedEmail } from "@/lib/email";
 import type { BookingStatus } from "@/types";
 
 export async function getAvailableSlots(
@@ -97,11 +98,11 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   const [business, service, enabledPaymentMethods] = await Promise.all([
     prisma.business.findUnique({
       where: { id: businessId, status: "active" },
-      select: { max_bookings_per_slot: true },
+      select: { name: true, max_bookings_per_slot: true },
     }),
     prisma.service.findUnique({
       where: { id: serviceId, business_id: businessId, is_active: true },
-      select: { duration: true },
+      select: { name: true, duration: true },
     }),
     prisma.paymentMethod.findMany({
       where: { business_id: businessId, is_enabled: true },
@@ -158,6 +159,16 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       status: "pending",
     },
   });
+
+  // Dispatch email notification without blocking
+  void sendBookingReceivedEmail({
+    to: customerEmail,
+    customerName,
+    businessName: business.name,
+    serviceName: service.name,
+    date: startsAt.toLocaleDateString(),
+    time: timeStr,
+  });
 }
 
 export async function updateBookingStatus(id: string, status: BookingStatus) {
@@ -177,6 +188,27 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
     data: { status, updated_at: new Date() },
   });
   if (result.count === 0) throw new Error("Booking not found");
+
+  if (status === "confirmed") {
+    const bookingDetails = await prisma.booking.findUnique({
+      where: { id },
+      include: {
+        business: { select: { name: true } },
+        service: { select: { name: true } },
+      }
+    });
+
+    if (bookingDetails && bookingDetails.customer_email) {
+      void sendBookingApprovedEmail({
+        to: bookingDetails.customer_email,
+        customerName: bookingDetails.customer_name,
+        businessName: bookingDetails.business.name,
+        serviceName: bookingDetails.service.name,
+        date: bookingDetails.starts_at.toLocaleDateString(),
+        time: bookingDetails.starts_at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+  }
 
   revalidatePath("/dashboard/bookings");
   revalidatePath("/dashboard");

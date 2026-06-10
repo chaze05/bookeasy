@@ -26,20 +26,13 @@ async function assertSuperadmin() {
   return { user };
 }
 
-export async function getAdminStats(): Promise<SuperadminStats> {
-  await assertSuperadmin();
+async function getAdminStatsInternal(): Promise<SuperadminStats> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const [
-    totalBusinesses,
-    activeBusinesses,
-    suspendedBusinesses,
-    totalUsers,
-    totalBookings,
-    newBusinessesToday,
-    newBookingsToday,
-    revenueData,
+    totalBusinesses, activeBusinesses, suspendedBusinesses, totalUsers,
+    totalBookings, newBusinessesToday, newBookingsToday, revenueData,
   ] = await Promise.all([
     prisma.business.count(),
     prisma.business.count({ where: { status: "active" } }),
@@ -55,20 +48,18 @@ export async function getAdminStats(): Promise<SuperadminStats> {
   ]);
 
   const totalRevenue = revenueData.reduce(
-    (sum, b) => sum + Number(b.service.price),
-    0
+    (sum, b) => sum + Number(b.service.price), 0
   );
 
   return {
-    totalBusinesses,
-    activeBusinesses,
-    suspendedBusinesses,
-    totalUsers,
-    totalBookings,
-    totalRevenue,
-    newBusinessesToday,
-    newBookingsToday,
+    totalBusinesses, activeBusinesses, suspendedBusinesses, totalUsers,
+    totalBookings, totalRevenue, newBusinessesToday, newBookingsToday,
   };
+}
+
+export async function getAdminStats(): Promise<SuperadminStats> {
+  await assertSuperadmin();
+  return getAdminStatsInternal();
 }
 
 export async function getAllBusinesses(): Promise<BusinessWithOwner[]> {
@@ -201,4 +192,62 @@ export async function resetUserPassword(userId: string) {
   if (error) throw error;
 
   revalidatePath("/superadmin/users");
+}
+
+export async function getSuperadminDashboardData() {
+  await assertSuperadmin();
+  
+  const [stats, businesses, recentBookings, pendingPayments] = await Promise.all([
+    getAdminStatsInternal(),
+    prisma.business.findMany({
+      take: 5,
+      orderBy: { created_at: 'desc' },
+    }),
+    prisma.booking.findMany({
+      take: 5,
+      orderBy: { created_at: 'desc' },
+      include: { business: { select: { name: true } }, service: { select: { name: true, price: true } } }
+    }),
+    prisma.subscriptionPayment.findMany({
+      where: { status: 'pending' },
+      orderBy: { created_at: 'desc' },
+      include: { business: { select: { id: true, name: true, status: true } } }
+    })
+  ]);
+
+  const ownerIds = [...new Set(businesses.map((b) => b.owner_id))];
+  const profiles = await prisma.profile.findMany({
+    where: { id: { in: ownerIds } },
+    select: { id: true, full_name: true, avatar_url: true },
+  });
+  const profileMap = new Map(profiles.map((p) => [p.id, p]));
+  const recentBusinesses = businesses.map((b) => ({
+    ...b,
+    owner: profileMap.get(b.owner_id) ?? null,
+  }));
+  
+  return serialize({ stats, recentBusinesses, recentBookings, pendingPayments });
+}
+
+export async function adminApproveSubscriptionPayment(id: string) {
+  await assertSuperadmin();
+  const payment = await prisma.subscriptionPayment.update({
+    where: { id },
+    data: { status: 'approved', notes: 'Approved by admin' },
+  });
+  
+  await prisma.business.update({
+    where: { id: payment.business_id },
+    data: { status: 'active', updated_at: new Date() },
+  });
+  revalidatePath('/superadmin');
+}
+
+export async function adminRejectSubscriptionPayment(id: string, notes?: string) {
+  await assertSuperadmin();
+  await prisma.subscriptionPayment.update({
+    where: { id },
+    data: { status: 'rejected', notes: notes || 'Rejected by admin' },
+  });
+  revalidatePath('/superadmin');
 }
