@@ -177,44 +177,77 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   if (startsAt <= new Date()) throw new Error("Cannot book in the past.");
 
   const bookingId = crypto.randomUUID();
-  const paymentProofUrl =
-    requiresPaymentProof && paymentProof instanceof File
-      ? await uploadPaymentProof(bookingId, paymentProof)
-      : null;
-
-  // Serialize per (business, slot) so concurrent requests cannot both pass the
-  // capacity check and double-book the last remaining slot.
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`select pg_advisory_xact_lock(hashtext(${businessId}), hashtext(${startsAt.toISOString()}))`;
-
-    const conflictCount = await tx.booking.count({
-      where: {
-        business_id: businessId,
-        starts_at: startsAt,
-        status: { not: "cancelled" },
-      },
-    });
-    if (conflictCount >= business.max_bookings_per_slot) {
-      throw new Error("This slot is no longer available. Please choose another time.");
+  let paymentProofUrl: string | null = null;
+  if (requiresPaymentProof && paymentProof instanceof File) {
+    try {
+      paymentProofUrl = await uploadPaymentProof(bookingId, paymentProof);
+    } catch (error) {
+      console.error("[createPublicBooking] payment proof upload failed:", {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fileType: paymentProof.type,
+        fileSize: paymentProof.size,
+      });
+      throw error;
     }
+  }
 
-    await tx.booking.create({
-      data: {
-        id: bookingId,
-        business_id: businessId,
-        service_id: serviceId,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        payment_method_id: requiresPaymentProof ? paymentMethodId : null,
-        payment_proof_url: paymentProofUrl,
-        notes,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        status: "pending",
-      },
+  // Atomic insert: advisory lock + capacity check + insert in ONE statement.
+  // A single statement is its own implicit transaction, so the xact-scoped
+  // lock is held for the whole check-and-insert. This avoids interactive
+  // transactions, which are unreliable through the Supabase transaction pooler.
+  let inserted: Array<{ id: string }>;
+  try {
+    inserted = await prisma.$queryRaw<Array<{ id: string }>>`
+      WITH slot_lock AS (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${businessId}),
+          hashtext(${startsAt.toISOString()})
+        )
+      )
+      INSERT INTO bookings (
+        id, business_id, service_id, customer_name, customer_email, customer_phone,
+        payment_method_id, payment_proof_url, notes, starts_at, ends_at, status,
+        created_at, updated_at
+      )
+      SELECT
+        ${bookingId}::uuid,
+        ${businessId}::uuid,
+        ${serviceId}::uuid,
+        ${customerName},
+        ${customerEmail},
+        ${customerPhone},
+        ${requiresPaymentProof ? paymentMethodId : null}::uuid,
+        ${paymentProofUrl},
+        ${notes},
+        ${startsAt}::timestamptz,
+        ${endsAt}::timestamptz,
+        'pending',
+        now(),
+        now()
+      FROM slot_lock
+      WHERE (
+        SELECT count(*) FROM bookings
+        WHERE business_id = ${businessId}::uuid
+          AND starts_at = ${startsAt}::timestamptz
+          AND status <> 'cancelled'
+      ) < ${business.max_bookings_per_slot}
+      RETURNING id
+    `;
+  } catch (error) {
+    console.error("[createPublicBooking] insert failed:", {
+      name: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : String(error),
+      code: (error as { code?: string }).code,
+      stack: error instanceof Error ? error.stack : undefined,
     });
-  });
+    throw error;
+  }
+
+  if (inserted.length === 0) {
+    throw new Error("This slot is no longer available. Please choose another time.");
+  }
 
   const dateLabel = formatZonedDate(startsAt, timeZone, { dateStyle: "long" });
   const timeLabel = formatZonedTime(startsAt, timeZone);

@@ -21,7 +21,7 @@ function createPrismaClient(): PrismaClient {
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     max: 5,
     idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 15_000,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({

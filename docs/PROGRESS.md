@@ -10,6 +10,15 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Hotfix: public booking submission (P2028)
+- Root-caused the payment submission failure: interactive `prisma.$transaction` is unreliable through the Supabase transaction pooler (`P2028`: "Transaction not found" / "Unable to start a transaction in the given time").
+- Replaced it with a single atomic SQL statement in `src/actions/bookings.ts`: `pg_advisory_xact_lock` + capacity count + `INSERT` in one `$queryRaw`, which runs as one implicit transaction and is pooler-safe. Returns `RETURNING id`; empty result means the slot filled up.
+- Raised pg pool `connectionTimeoutMillis` to 15s (`src/lib/prisma.ts`).
+- Also fixed: `pg_advisory_xact_lock` returns `void`, which Prisma cannot deserialize via `$queryRaw` (now only used inside a CTE that is never selected).
+- Verified end-to-end against a real production server: HTTP 200, booking row created with correct Manila→UTC time, proof file uploaded to Supabase Storage, then test row/file cleaned up.
+- Note: this also confirmed email delivery is blocked until a sending domain is verified in Resend (currently `bookeasy.app` is unverified) and Brevo rejects unrecognized IPs.
+- Important build note: an incremental `next build` served stale chunks once; a clean `.next` rebuild fixed it. Verify changed strings exist in `.next` before testing if something seems off.
+
 ### 2026-09-26 — Booking correctness: timezone, atomic slots, owner notifications (batch 1)
 - **Timezone engine** — added `src/lib/timezone.ts` (Intl-based, no dependency): `zonedTimeToUtc`, `getZonedDayRange`, `getZonedMinutes`, `getZonedDateKey`, `formatZonedDate/Time`. Unit-checked against Manila (UTC+8), NY DST and NY EST cases (all pass).
 - **Slot calculation** (`src/actions/bookings.ts`) now runs entirely in the business timezone: correct day ranges, "today" detection, past-slot filtering, and service is now scoped to the business.
