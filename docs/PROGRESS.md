@@ -10,6 +10,13 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Homepage pricing section (CMS-driven)
+- New `src/components/homepage/PricingSection.tsx` matching the existing homepage design (dark zinc/emerald, highlighted plan with glow + badge, per-line feature list, `id="pricing"` anchor for nav links).
+- Registered in `HomepageRenderer.tsx`; fallback defaults added in `src/lib/homepage-content.ts` (order: hero → social proof → features → pricing → CTA).
+- Superadmin editor extended (`section-editor.tsx`): Pricing label/color and editable fields (plans with name, price, period, badge, description, one-feature-per-line, CTA, highlight flag, billing note).
+- `migration_009.sql` applied live: inserts the default pricing content (Starter ₱0 / Pro ₱799 highlighted / Business ₱1,999) and moves CTA after it.
+- Verified: production build, homepage HTML contains heading, "Most popular", "₱799" and `id="pricing"`.
+
 ### 2026-09-26 — Hotfix: public booking submission (P2028)
 - Root-caused the payment submission failure: interactive `prisma.$transaction` is unreliable through the Supabase transaction pooler (`P2028`: "Transaction not found" / "Unable to start a transaction in the given time").
 - Replaced it with a single atomic SQL statement in `src/actions/bookings.ts`: `pg_advisory_xact_lock` + capacity count + `INSERT` in one `$queryRaw`, which runs as one implicit transaction and is pooler-safe. Returns `RETURNING id`; empty result means the slot filled up.

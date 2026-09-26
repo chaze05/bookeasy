@@ -2,6 +2,7 @@ import { DEFAULT_HOMEPAGE_SECTIONS } from "@/lib/homepage-content";
 import { CTASection } from "./CTASection";
 import { FeaturesSection } from "./FeaturesSection";
 import { HeroSection } from "./HeroSection";
+import { PricingSection } from "./PricingSection";
 import { SocialProofSection } from "./SocialProofSection";
 
 export interface HomepageSection {
@@ -15,6 +16,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType<{ content: unknown 
   hero: HeroSection,
   social_proof: SocialProofSection,
   features: FeaturesSection,
+  pricing: PricingSection,
   cta: CTASection,
 };
 

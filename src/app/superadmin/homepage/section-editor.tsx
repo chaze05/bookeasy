@@ -38,6 +38,7 @@ const SECTION_LABELS: Record<string, string> = {
   hero: "Hero",
   social_proof: "Social Proof",
   features: "Features",
+  pricing: "Pricing",
   cta: "Call to Action",
   footer: "Footer",
 };
@@ -47,6 +48,7 @@ const SECTION_COLORS: Record<string, string> = {
   hero: "bg-violet-500/15 text-violet-400 border-violet-500/30",
   social_proof: "bg-blue-500/15 text-blue-400 border-blue-500/30",
   features: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  pricing: "bg-teal-500/15 text-teal-400 border-teal-500/30",
   cta: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   footer: "bg-pink-500/15 text-pink-400 border-pink-500/30",
 };
@@ -325,6 +327,32 @@ function ContentEditor({
           ]}
           onChange={(v) => set("testimonials", v)}
         />
+      </div>
+    );
+  }
+
+  if (sectionKey === "pricing") {
+    return (
+      <div className="grid gap-4">
+        <Field label="Heading" value={textValue(draft.heading)} onChange={(v) => set("heading", v)} />
+        <Field label="Subheading" value={textValue(draft.subheading)} multiline onChange={(v) => set("subheading", v)} />
+        <ObjectList
+          label="Plans"
+          values={objectArray(draft.plans)}
+          fields={[
+            { key: "name", label: "Plan name" },
+            { key: "price", label: "Price (e.g. ₱799)" },
+            { key: "period", label: "Period (e.g. /month)" },
+            { key: "badge", label: "Badge (highlighted plan)" },
+            { key: "description", label: "Description", multiline: true },
+            { key: "features", label: "Features (one per line)", multiline: true },
+            { key: "cta_text", label: "Button text" },
+            { key: "cta_href", label: "Button link" },
+            { key: "highlighted", label: "Highlight? (true/false)" },
+          ]}
+          onChange={(v) => set("plans", v)}
+        />
+        <Field label="Billing note" value={textValue(draft.billing_note)} onChange={(v) => set("billing_note", v)} />
       </div>
     );
   }
