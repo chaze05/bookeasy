@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyBookingActionToken } from "@/lib/booking-tokens";
+import { buildManageUrl, verifyBookingActionToken } from "@/lib/booking-tokens";
+import { getAppBaseUrl } from "@/lib/notify";
 import { sendBookingApprovedEmail } from "@/lib/email";
 import { formatZonedDate, formatZonedTime, safeTimeZone } from "@/lib/timezone";
 
@@ -129,6 +130,12 @@ export async function POST(request: Request) {
 
   if (status === "confirmed" && booking.customer_email) {
     const timeZone = safeTimeZone(booking.business.timezone);
+    let manageUrl: string | undefined;
+    try {
+      manageUrl = buildManageUrl(await getAppBaseUrl(), booking.id);
+    } catch (error) {
+      console.error("Failed to build manage link:", error);
+    }
     await sendBookingApprovedEmail({
       to: booking.customer_email,
       businessEmail: booking.business.contact_email ?? undefined,
@@ -137,6 +144,7 @@ export async function POST(request: Request) {
       serviceName: booking.service.name,
       date: formatZonedDate(booking.starts_at, timeZone, { dateStyle: "long" }),
       time: formatZonedTime(booking.starts_at, timeZone),
+      manageUrl,
     });
   }
 

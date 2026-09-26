@@ -10,6 +10,14 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Customer self-service manage/reschedule page
+- `src/lib/booking-tokens.ts`: added signed `manage` tokens (30-day expiry, HMAC, timing-safe) + `buildManageUrl`.
+- New page `/booking/manage?token=…` (`src/app/booking/manage/`): no-index, dark-themed, shows booking summary (service, date/time in business timezone, status, deposit/balance) and a client panel to pick a new date/slot and reschedule or cancel. Invalid/expired tokens and non-manageable statuses render friendly messages; "Book again" links back to the business page.
+- New server actions (`src/actions/booking-manage.ts`): `getManageSlots`, `rescheduleBooking`, `cancelBookingByToken` — every action verifies the token; reschedule validates hours/interval/past and uses the same atomic pooler-safe single-statement update with advisory lock + capacity check.
+- Customer emails: `BookingReceivedEmail` and `BookingApprovedEmail` now include a "Reschedule or cancel" button linking to the manage page; wired through `createPublicBooking`, `updateBookingStatus`, and the one-click confirm route.
+- Verified against a production server: page renders (200) for a valid token, rejects an invalid token, and the reschedule statement moved a booking 1 PM → 3 PM Manila (05:00Z → 07:00Z) atomically; test booking cleaned up.
+- Follow-up: reschedule/cancel do not yet email the business owner (dashboard reflects the change immediately).
+
 ### 2026-09-26 — Deposits / partial payments
 - `migration_010.sql` applied live: `businesses.deposit_type` (`none|percent|fixed`), `businesses.deposit_value`, `bookings.amount_total`, `bookings.deposit_amount`.
 - Prisma schema + types updated.

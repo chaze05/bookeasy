@@ -14,20 +14,17 @@ function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("base64url");
 }
 
-/** Creates a token binding a booking + action (confirm/decline) with an expiry. */
-export function createBookingActionToken(bookingId: string, action: BookingAction): string {
+function createToken(bookingId: string, action: string): string {
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   const payload = `${bookingId}.${action}.${expiresAt}`;
   return `${payload}.${sign(payload)}`;
 }
 
-export function verifyBookingActionToken(
-  token: string
-): { bookingId: string; action: BookingAction; expiresAt: number } | null {
+function verifyToken(token: string, expectedAction: string): { bookingId: string; expiresAt: number } | null {
   const parts = token.split(".");
   if (parts.length !== 4) return null;
   const [bookingId, action, expiresAtRaw, signature] = parts;
-  if (action !== "confirm" && action !== "decline") return null;
+  if (action !== expectedAction) return null;
   const expiresAt = Number(expiresAtRaw);
   if (!bookingId || !Number.isFinite(expiresAt)) return null;
 
@@ -37,10 +34,38 @@ export function verifyBookingActionToken(
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   if (Date.now() > expiresAt) return null;
-  return { bookingId, action, expiresAt };
+  return { bookingId, expiresAt };
+}
+
+/** Owner one-click action link token (confirm / decline). */
+export function createBookingActionToken(bookingId: string, action: BookingAction): string {
+  return createToken(bookingId, action);
+}
+
+export function verifyBookingActionToken(
+  token: string
+): { bookingId: string; action: BookingAction; expiresAt: number } | null {
+  const verified = verifyToken(token, "confirm") ?? verifyToken(token, "decline");
+  if (!verified) return null;
+  const action: BookingAction = token.split(".")[1] === "confirm" ? "confirm" : "decline";
+  return { ...verified, action };
 }
 
 export function buildBookingActionUrl(baseUrl: string, bookingId: string, action: BookingAction): string {
   const token = createBookingActionToken(bookingId, action);
   return `${baseUrl.replace(/\/$/, "")}/api/bookings/action?token=${encodeURIComponent(token)}`;
+}
+
+/** Customer self-service "manage my booking" (reschedule / cancel) token. */
+export function createManageToken(bookingId: string): string {
+  return createToken(bookingId, "manage");
+}
+
+export function verifyManageToken(token: string): { bookingId: string; expiresAt: number } | null {
+  return verifyToken(token, "manage");
+}
+
+export function buildManageUrl(baseUrl: string, bookingId: string): string {
+  const token = createManageToken(bookingId);
+  return `${baseUrl.replace(/\/$/, "")}/booking/manage?token=${encodeURIComponent(token)}`;
 }

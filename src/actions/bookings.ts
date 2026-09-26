@@ -10,7 +10,7 @@ import {
   sendOwnerNewBookingEmail,
 } from "@/lib/email";
 import { getAppBaseUrl, getBusinessNotificationEmail } from "@/lib/notify";
-import { buildBookingActionUrl } from "@/lib/booking-tokens";
+import { buildBookingActionUrl, buildManageUrl } from "@/lib/booking-tokens";
 import {
   formatZonedDate,
   formatZonedTime,
@@ -267,6 +267,15 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   const dateLabel = formatZonedDate(startsAt, timeZone, { dateStyle: "long" });
   const timeLabel = formatZonedTime(startsAt, timeZone);
 
+  let baseUrl: string | undefined;
+  let manageUrl: string | undefined;
+  try {
+    baseUrl = await getAppBaseUrl();
+    manageUrl = buildManageUrl(baseUrl, bookingId);
+  } catch (error) {
+    console.error("Failed to build booking links:", error);
+  }
+
   const emailJobs: Promise<unknown>[] = [
     sendBookingReceivedEmail({
       to: customerEmail,
@@ -276,13 +285,13 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       serviceName: service.name,
       date: dateLabel,
       time: timeLabel,
+      manageUrl,
     }),
   ];
 
   try {
     const ownerEmail = await getBusinessNotificationEmail(businessId);
-    if (ownerEmail) {
-      const baseUrl = await getAppBaseUrl();
+    if (ownerEmail && baseUrl) {
       emailJobs.push(
         sendOwnerNewBookingEmail({
           to: ownerEmail,
@@ -339,6 +348,12 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
 
     if (bookingDetails && bookingDetails.customer_email) {
       const timeZone = safeTimeZone(bookingDetails.business.timezone);
+      let manageUrl: string | undefined;
+      try {
+        manageUrl = buildManageUrl(await getAppBaseUrl(), bookingDetails.id);
+      } catch (error) {
+        console.error("Failed to build manage link:", error);
+      }
       await sendBookingApprovedEmail({
         to: bookingDetails.customer_email,
         businessEmail: bookingDetails.business.contact_email ?? undefined,
@@ -347,6 +362,7 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
         serviceName: bookingDetails.service.name,
         date: formatZonedDate(bookingDetails.starts_at, timeZone, { dateStyle: "long" }),
         time: formatZonedTime(bookingDetails.starts_at, timeZone),
+        manageUrl,
       });
     }
   }

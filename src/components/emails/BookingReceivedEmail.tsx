@@ -1,5 +1,6 @@
 import {
   Body,
+  Button,
   Container,
   Head,
   Heading,
@@ -17,6 +18,7 @@ interface BookingReceivedEmailProps {
   serviceName: string;
   date: string;
   time: string;
+  manageUrl?: string;
 }
 
 export const BookingReceivedEmail = ({
@@ -25,6 +27,7 @@ export const BookingReceivedEmail = ({
   serviceName,
   date,
   time,
+  manageUrl,
 }: BookingReceivedEmailProps) => {
   const previewText = `Your booking request for ${serviceName} is pending review.`;
 
@@ -54,6 +57,17 @@ export const BookingReceivedEmail = ({
             <Text style={text}>
               We will send you another email as soon as your booking is confirmed. If you have any questions in the meantime, feel free to reply to this email.
             </Text>
+
+            {manageUrl ? (
+              <Section style={buttonContainer}>
+                <Button style={button} href={manageUrl}>
+                  Reschedule or cancel
+                </Button>
+                <Text style={buttonHint}>
+                  Changed your mind? Use this link to pick a different time or cancel.
+                </Text>
+              </Section>
+            ) : null}
             
             <Hr style={hr} />
             
@@ -133,6 +147,29 @@ const detailItem = {
 const hr = {
   borderColor: "#e4e4e7",
   margin: "32px 0",
+};
+
+const buttonContainer = {
+  textAlign: "center" as const,
+  margin: "8px 0 24px 0",
+};
+
+const button = {
+  backgroundColor: "#10b981",
+  borderRadius: "8px",
+  color: "#ffffff",
+  fontSize: "15px",
+  fontWeight: "600",
+  textDecoration: "none",
+  textAlign: "center" as const,
+  display: "inline-block",
+  padding: "12px 28px",
+};
+
+const buttonHint = {
+  color: "#a1a1aa",
+  fontSize: "12px",
+  marginTop: "10px",
 };
 
 const footer = {

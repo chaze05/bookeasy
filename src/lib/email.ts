@@ -153,6 +153,7 @@ export async function sendBookingReceivedEmail({
   serviceName,
   date,
   time,
+  manageUrl,
 }: {
   to: string;
   businessEmail?: string;
@@ -161,6 +162,7 @@ export async function sendBookingReceivedEmail({
   serviceName: string;
   date: string;
   time: string;
+  manageUrl?: string;
 }) {
   await deliverEmail({
     from: `${safeHeaderValue(businessName)} <${FROM_EMAIL}>`,
@@ -173,6 +175,7 @@ export async function sendBookingReceivedEmail({
       serviceName,
       date,
       time,
+      manageUrl,
     }) as ReactElement,
   });
 }
@@ -185,6 +188,7 @@ export async function sendBookingApprovedEmail({
   serviceName,
   date,
   time,
+  manageUrl,
 }: {
   to: string;
   businessEmail?: string;
@@ -193,6 +197,7 @@ export async function sendBookingApprovedEmail({
   serviceName: string;
   date: string;
   time: string;
+  manageUrl?: string;
 }) {
   await deliverEmail({
     from: `${safeHeaderValue(businessName)} <${FROM_EMAIL}>`,
@@ -205,6 +210,7 @@ export async function sendBookingApprovedEmail({
       serviceName,
       date,
       time,
+      manageUrl,
     }) as ReactElement,
   });
 }
