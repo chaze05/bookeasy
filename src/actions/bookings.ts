@@ -124,11 +124,14 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       select: {
         name: true,
         contact_email: true,
+        currency: true,
         timezone: true,
         max_bookings_per_slot: true,
         business_hours_start: true,
         business_hours_end: true,
         booking_interval: true,
+        deposit_type: true,
+        deposit_value: true,
       },
     }),
     prisma.service.findUnique({
@@ -176,6 +179,16 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   const endsAt = new Date(startsAt.getTime() + service.duration * 60_000);
   if (startsAt <= new Date()) throw new Error("Cannot book in the past.");
 
+  const amountTotal = Number(service.price);
+  const rawDeposit = Number(business.deposit_value);
+  let depositAmount = 0;
+  if (business.deposit_type === "percent" && rawDeposit > 0) {
+    depositAmount = Math.round(amountTotal * rawDeposit) / 100;
+  } else if (business.deposit_type === "fixed" && rawDeposit > 0) {
+    depositAmount = rawDeposit;
+  }
+  depositAmount = Math.min(Math.max(depositAmount, 0), amountTotal);
+
   const bookingId = crypto.randomUUID();
   let paymentProofUrl: string | null = null;
   if (requiresPaymentProof && paymentProof instanceof File) {
@@ -208,8 +221,8 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       )
       INSERT INTO bookings (
         id, business_id, service_id, customer_name, customer_email, customer_phone,
-        payment_method_id, payment_proof_url, notes, starts_at, ends_at, status,
-        created_at, updated_at
+        payment_method_id, payment_proof_url, amount_total, deposit_amount, notes,
+        starts_at, ends_at, status, created_at, updated_at
       )
       SELECT
         ${bookingId}::uuid,
@@ -220,6 +233,8 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
         ${customerPhone},
         ${requiresPaymentProof ? paymentMethodId : null}::uuid,
         ${paymentProofUrl},
+        ${amountTotal}::numeric,
+        ${depositAmount}::numeric,
         ${notes},
         ${startsAt}::timestamptz,
         ${endsAt}::timestamptz,
@@ -276,7 +291,10 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
           customerEmail,
           customerPhone,
           serviceName: service.name,
-          price: Number(service.price).toFixed(2),
+          price: amountTotal.toFixed(2),
+          currency: business.currency,
+          depositAmount: depositAmount.toFixed(2),
+          balanceAmount: (amountTotal - depositAmount).toFixed(2),
           date: dateLabel,
           time: timeLabel,
           notes,

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { completeBookingWithPayment, updateBookingStatus } from "@/actions/bookings";
 import type { BookingWithRelations, BookingStatus } from "@/types";
+import { formatMoney } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,6 +75,7 @@ const allStatuses: BookingStatus[] = [
 interface BookingRowProps {
   booking: BookingWithRelations;
   paymentMethods: PaymentMethodOption[];
+  currency: string;
 }
 
 type PaymentMethodOption = {
@@ -82,7 +84,7 @@ type PaymentMethodOption = {
   label: string;
 };
 
-function BookingRow({ booking, paymentMethods }: BookingRowProps) {
+function BookingRow({ booking, paymentMethods, currency }: BookingRowProps) {
   const [isPending, startTransition] = useTransition();
   const [completeOpen, setCompleteOpen] = useState(false);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState(paymentMethods[0]?.id ?? "");
@@ -153,19 +155,33 @@ function BookingRow({ booking, paymentMethods }: BookingRowProps) {
         </Badge>
       </TableCell>
       <TableCell>
-        {booking.payment_proof_url ? (
-          <a
-            href={booking.payment_proof_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
-          >
-            <ReceiptText className="h-3.5 w-3.5" />
-            View proof
-          </a>
-        ) : (
-          <span className="text-xs text-zinc-600">-</span>
-        )}
+        <div className="flex flex-col gap-0.5">
+          {booking.payment_proof_url ? (
+            <a
+              href={booking.payment_proof_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+            >
+              <ReceiptText className="h-3.5 w-3.5" />
+              View proof
+            </a>
+          ) : (
+            <span className="text-xs text-zinc-600">-</span>
+          )}
+          {booking.deposit_amount != null && Number(booking.deposit_amount) > 0 ? (
+            <span className="text-xs text-zinc-500">
+              Deposit {formatMoney(Number(booking.deposit_amount), currency)}
+              {booking.amount_total != null
+                ? ` · Balance ${formatMoney(Number(booking.amount_total) - Number(booking.deposit_amount), currency)}`
+                : ""}
+            </span>
+          ) : booking.amount_total != null ? (
+            <span className="text-xs text-zinc-600">
+              {formatMoney(Number(booking.amount_total), currency)}
+            </span>
+          ) : null}
+        </div>
       </TableCell>
       <TableCell>
         <DropdownMenu>
@@ -293,10 +309,11 @@ function BookingRow({ booking, paymentMethods }: BookingRowProps) {
 
 interface BookingsTableProps {
   bookings: BookingWithRelations[];
-  paymentMethods: PaymentMethodOption[];
+  paymentMethods: { id: string; type: string; label: string }[];
+  currency?: string;
 }
 
-export function BookingsTable({ bookings, paymentMethods }: BookingsTableProps) {
+export function BookingsTable({ bookings, paymentMethods, currency = "PHP" }: BookingsTableProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const filtered =
@@ -348,7 +365,7 @@ export function BookingsTable({ bookings, paymentMethods }: BookingsTableProps) 
             </TableHeader>
             <TableBody>
               {filtered.map((booking) => (
-                <BookingRow key={booking.id} booking={booking} paymentMethods={paymentMethods} />
+                <BookingRow key={booking.id} booking={booking} paymentMethods={paymentMethods} currency={currency} />
               ))}
             </TableBody>
           </Table>

@@ -6,18 +6,25 @@ import { businessSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-const bookingSettingsSchema = z.object({
-  allow_multiple_bookings: z.string().transform((v) => v === "true"),
-  max_bookings_per_slot: z.coerce.number().int().min(1).max(100),
-  booking_interval: z.coerce.number().int().min(5).max(240),
-  business_hours_start: z
-    .string()
-    .regex(/^\d{2}:\d{2}$/, "Invalid time format"),
-  business_hours_end: z
-    .string()
-    .regex(/^\d{2}:\d{2}$/, "Invalid time format"),
-  realtime_enabled: z.string().transform((v) => v === "true"),
-});
+const bookingSettingsSchema = z
+  .object({
+    allow_multiple_bookings: z.string().transform((v) => v === "true"),
+    max_bookings_per_slot: z.coerce.number().int().min(1).max(100),
+    booking_interval: z.coerce.number().int().min(5).max(240),
+    business_hours_start: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+    business_hours_end: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+    realtime_enabled: z.string().transform((v) => v === "true"),
+    deposit_type: z.enum(["none", "percent", "fixed"]),
+    deposit_value: z.coerce.number().min(0).max(1_000_000),
+  })
+  .refine((data) => data.deposit_type !== "percent" || data.deposit_value <= 100, {
+    message: "Deposit percentage must be between 0 and 100",
+    path: ["deposit_value"],
+  });
 
 export async function updateBusiness(id: string, formData: FormData) {
   const supabase = await createClient();
@@ -94,6 +101,8 @@ export async function updateBookingSettings(id: string, formData: FormData) {
     business_hours_start: formData.get("business_hours_start"),
     business_hours_end: formData.get("business_hours_end"),
     realtime_enabled: formData.get("realtime_enabled"),
+    deposit_type: formData.get("deposit_type"),
+    deposit_value: formData.get("deposit_value"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 

@@ -8,7 +8,13 @@ import { formatMoney } from "@/lib/utils";
 import { BookingWidget, type BookingService, type PaymentMethodData } from "./booking-widget";
 
 interface ServicesSectionProps {
-  business: { id: string; name: string; currency?: string };
+  business: {
+    id: string;
+    name: string;
+    currency?: string;
+    deposit_type?: string;
+    deposit_value?: number;
+  };
   services: BookingService[];
   paymentMethods?: PaymentMethodData[];
 }

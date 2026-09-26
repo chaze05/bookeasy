@@ -22,6 +22,8 @@ interface OwnerBookingNotificationEmailProps {
   serviceName: string;
   price?: string;
   currency?: string;
+  depositAmount?: string;
+  balanceAmount?: string;
   date: string;
   time: string;
   notes?: string | null;
@@ -37,6 +39,8 @@ export const OwnerBookingNotificationEmail = ({
   serviceName,
   price,
   currency,
+  depositAmount,
+  balanceAmount,
   date,
   time,
   notes,
@@ -44,7 +48,9 @@ export const OwnerBookingNotificationEmail = ({
   declineUrl,
 }: OwnerBookingNotificationEmailProps) => {
   const previewText = `New booking from ${customerName} — ${serviceName} on ${date} at ${time}`;
-  const amount = price ? `${currency ? `${currency} ` : ""}${price}` : null;
+  const money = (amount: string) => `${currency ? `${currency} ` : ""}${amount}`;
+  const amount = price ? money(price) : null;
+  const hasDeposit = Boolean(depositAmount && Number(depositAmount) > 0);
 
   return (
     <Html>
@@ -68,6 +74,14 @@ export const OwnerBookingNotificationEmail = ({
               <Text style={detailItem}><strong>Date:</strong> {date}</Text>
               <Text style={detailItem}><strong>Time:</strong> {time}</Text>
               {amount ? <Text style={detailItem}><strong>Price:</strong> {amount}</Text> : null}
+              {hasDeposit && depositAmount ? (
+                <>
+                  <Text style={detailItem}><strong>Deposit due now:</strong> {money(depositAmount)}</Text>
+                  {balanceAmount ? (
+                    <Text style={detailItem}><strong>Balance at appointment:</strong> {money(balanceAmount)}</Text>
+                  ) : null}
+                </>
+              ) : null}
             </Section>
 
             <Section style={detailsContainer}>

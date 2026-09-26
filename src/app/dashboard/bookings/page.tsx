@@ -14,7 +14,7 @@ export default async function BookingsPage() {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true },
+    select: { id: true, currency: true },
   });
 
   let bookings: BookingWithRelations[] = [];
@@ -53,7 +53,11 @@ export default async function BookingsPage() {
           Manage and track all your appointments.
         </p>
       </div>
-      <BookingsTable bookings={bookings} paymentMethods={paymentMethods} />
+      <BookingsTable
+        bookings={bookings}
+        paymentMethods={paymentMethods}
+        currency={business?.currency ?? "PHP"}
+      />
     </div>
   );
 }

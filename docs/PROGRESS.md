@@ -10,6 +10,15 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Deposits / partial payments
+- `migration_010.sql` applied live: `businesses.deposit_type` (`none|percent|fixed`), `businesses.deposit_value`, `bookings.amount_total`, `bookings.deposit_amount`.
+- Prisma schema + types updated.
+- Booking settings (`dashboard/settings`): new Deposit card — type selector (no deposit / percentage / fixed), value input with ₱ / % affordance, helper copy; validated server-side (percent capped 0-100, fixed capped at service price).
+- `createPublicBooking` computes `amount_total` + `deposit_amount` and stores them in the atomic insert.
+- Public booking widget shows "Deposit due now" plus "Balance … at the appointment" for prepaid methods; cash shows "Pay at the appointment".
+- Owner new-booking email shows price, deposit due and remaining balance; dashboard bookings table shows deposit/balance per booking.
+- Verified end-to-end: booking with 50% deposit stored `amount_total 40.00` / `deposit_amount 20.00`; demo business reset to no deposit after the test.
+
 ### 2026-09-26 — Homepage pricing section (CMS-driven)
 - New `src/components/homepage/PricingSection.tsx` matching the existing homepage design (dark zinc/emerald, highlighted plan with glow + badge, per-line feature list, `id="pricing"` anchor for nav links).
 - Registered in `HomepageRenderer.tsx`; fallback defaults added in `src/lib/homepage-content.ts` (order: hero → social proof → features → pricing → CTA).

@@ -51,7 +51,13 @@ export interface PaymentMethodData {
 interface BookingWidgetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  business: { id: string; name: string; currency?: string };
+  business: {
+    id: string;
+    name: string;
+    currency?: string;
+    deposit_type?: string;
+    deposit_value?: number;
+  };
   service: BookingService;
   paymentMethods?: PaymentMethodData[];
 }
@@ -195,6 +201,17 @@ export function BookingWidget({
 
   const activePaymentMethod = paymentMethods.find((m) => m.type === selectedPaymentType);
   const activePaymentRequiresProof = Boolean(activePaymentMethod && activePaymentMethod.type !== "cash");
+
+  const totalAmount = service.price;
+  const rawDeposit = Number(business.deposit_value ?? 0);
+  const configuredDeposit =
+    business.deposit_type === "percent"
+      ? Math.round(totalAmount * rawDeposit) / 100
+      : business.deposit_type === "fixed"
+        ? rawDeposit
+        : 0;
+  const depositAmount = Math.min(Math.max(configuredDeposit, 0), totalAmount);
+  const showDeposit = activePaymentRequiresProof && depositAmount > 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -453,9 +470,22 @@ export function BookingWidget({
                 </div>
 
                 {/* Amount due */}
-                <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
-                  <p className="text-sm text-zinc-400">Amount due</p>
-                  <p className="text-xl font-bold text-zinc-100">{formatMoney(service.price, business.currency)}</p>
+                <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-zinc-400">
+                      {showDeposit ? "Deposit due now" : "Amount due"}
+                    </p>
+                    <p className="text-xl font-bold text-zinc-100">
+                      {formatMoney(showDeposit ? depositAmount : totalAmount, business.currency)}
+                    </p>
+                  </div>
+                  {showDeposit ? (
+                    <p className="text-right text-xs text-zinc-500">
+                      Balance {formatMoney(totalAmount - depositAmount, business.currency)} at the appointment
+                    </p>
+                  ) : !activePaymentRequiresProof ? (
+                    <p className="text-right text-xs text-zinc-500">Pay at the appointment</p>
+                  ) : null}
                 </div>
 
                 {/* Payment method tabs */}

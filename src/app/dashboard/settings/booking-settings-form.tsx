@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { Loader2, Clock, Settings2, Zap } from "lucide-react";
+import { Loader2, Clock, Settings2, Zap, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateBookingSettings } from "@/actions/business";
@@ -35,6 +35,12 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
   const [realtimeEnabled, setRealtimeEnabled] = useState(
     business?.realtime_enabled ?? true
   );
+  const [depositType, setDepositType] = useState<"none" | "percent" | "fixed">(
+    business?.deposit_type ?? "none"
+  );
+  const [depositValue, setDepositValue] = useState(
+    business?.deposit_value ?? 0
+  );
 
   if (!business) {
     return (
@@ -56,6 +62,8 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
       fd.append("business_hours_start", hoursStart);
       fd.append("business_hours_end", hoursEnd);
       fd.append("realtime_enabled", String(realtimeEnabled));
+      fd.append("deposit_type", depositType);
+      fd.append("deposit_value", String(depositValue));
       try {
         await updateBookingSettings(business!.id, fd);
         toast.success("Booking settings saved");
@@ -158,6 +166,74 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
               className={inputClass}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Deposit */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-zinc-500" />
+          <h2 className="text-sm font-semibold text-zinc-100">Deposit</h2>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-zinc-500">
+            Ask customers to pay a deposit up front to reserve their slot. The
+            remaining balance is collected at the appointment.
+          </p>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Deposit type</Label>
+            <select
+              value={depositType}
+              onChange={(e) =>
+                setDepositType(e.target.value as "none" | "percent" | "fixed")
+              }
+              className="h-8 w-56 rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+            >
+              <option value="none" className="bg-zinc-800">
+                No deposit (full payment)
+              </option>
+              <option value="percent" className="bg-zinc-800">
+                Percentage of service price
+              </option>
+              <option value="fixed" className="bg-zinc-800">
+                Fixed amount
+              </option>
+            </select>
+          </div>
+
+          {depositType !== "none" && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-zinc-300">
+                {depositType === "percent" ? "Deposit percentage" : "Deposit amount"}
+              </Label>
+              <div className="flex items-center gap-2">
+                {depositType === "fixed" && (
+                  <span className="text-sm text-zinc-400">
+                    {(business?.currency ?? "PHP") === "PHP" ? "₱" : business?.currency}
+                  </span>
+                )}
+                <Input
+                  type="number"
+                  min={0}
+                  max={depositType === "percent" ? 100 : undefined}
+                  step={depositType === "percent" ? 1 : 0.01}
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(Number(e.target.value))}
+                  className={`w-32 ${inputClass}`}
+                />
+                {depositType === "percent" && (
+                  <span className="text-sm text-zinc-400">%</span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-600">
+                {depositType === "percent"
+                  ? "A 50% deposit is a common choice. Capped at the service price."
+                  : "Applied per booking, capped at the service price."}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

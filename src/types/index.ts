@@ -46,6 +46,8 @@ export interface Business {
   business_hours_end: string;
   realtime_enabled: boolean;
   status: BusinessStatus;
+  deposit_type: "none" | "percent" | "fixed";
+  deposit_value: number;
   created_at: string;
   updated_at: string;
 }
@@ -116,6 +118,8 @@ export interface Booking {
   customer_phone: string | null;
   payment_method_id: string | null;
   payment_proof_url: string | null;
+  amount_total: number | null;
+  deposit_amount: number | null;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;

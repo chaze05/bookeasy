@@ -218,6 +218,8 @@ export async function sendOwnerNewBookingEmail({
   serviceName,
   price,
   currency,
+  depositAmount,
+  balanceAmount,
   date,
   time,
   notes,
@@ -232,6 +234,8 @@ export async function sendOwnerNewBookingEmail({
   serviceName: string;
   price?: string;
   currency?: string;
+  depositAmount?: string;
+  balanceAmount?: string;
   date: string;
   time: string;
   notes?: string | null;
@@ -251,6 +255,8 @@ export async function sendOwnerNewBookingEmail({
       serviceName,
       price,
       currency,
+      depositAmount,
+      balanceAmount,
       date,
       time,
       notes,
