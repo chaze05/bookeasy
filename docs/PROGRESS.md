@@ -77,15 +77,18 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 - Added `turbopack.root` to silence the multiple-lockfile workspace warning.
 
 ## Pending / Planned (in agreed order)
-1. ~~Timezone-correct booking + atomic slot booking + owner notification email~~ — done (batch 1)
-2. Deposits / partial payments
-3. Staff logins + permissions
-4. Subscription plan enforcement
-5. PH Data Privacy Act compliance
-6. Receipts (not official invoices)
-7. Backups + monitoring
-8. PWA + OG images
-9. Reviews + testimonials
-10. Customer booking reminders (email/SMS)
-11. PayMongo integration (PH-first) with webhooks
-12. Deploy to Vercel: env vars, verified sender domain, smoke test
+1. ~~Timezone-correct booking + atomic slot booking + owner notification email~~ - done
+2. ~~Homepage pricing section~~ - done
+3. ~~Deposits / partial payments~~ - done
+4. ~~Customer reschedule / manage page~~ - done
+5. Staff logins + permissions
+6. Subscription plan enforcement
+7. PH Data Privacy Act compliance
+8. Receipts (not official invoices)
+9. Backups + monitoring
+10. PWA + OG images
+11. Reviews + testimonials
+12. Customer booking reminders (email/SMS)
+13. PayMongo integration (PH-first) with webhooks
+14. Deploy to Vercel: env vars, verified sender domain, smoke test
+15. Follow-ups: email owner on customer reschedule/cancel; refactor duplicated slot validation
