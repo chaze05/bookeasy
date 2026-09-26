@@ -38,6 +38,7 @@ export default async function BookingPage({
       name: true,
       description: true,
       logo_url: true,
+      currency: true,
       business_hours_start: true,
       business_hours_end: true,
       services: {
@@ -80,7 +81,7 @@ export default async function BookingPage({
       />
 
       <ServicesSection
-        business={{ id: business.id, name: business.name }}
+        business={{ id: business.id, name: business.name, currency: business.currency }}
         services={services}
         paymentMethods={business.payment_methods.map((m) => ({
           ...m,

@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import { getAvailableSlots, createPublicBooking } from "@/actions/bookings";
 import { format } from "date-fns";
 
@@ -51,7 +51,7 @@ export interface PaymentMethodData {
 interface BookingWidgetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  business: { id: string; name: string };
+  business: { id: string; name: string; currency?: string };
   service: BookingService;
   paymentMethods?: PaymentMethodData[];
 }
@@ -77,10 +77,6 @@ const PAYMENT_COLORS: Record<string, string> = {
 function fmtTime(t: string) {
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-}
-
-function fmtPrice(price: number) {
-  return price % 1 === 0 ? price.toFixed(0) : price.toFixed(2);
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -243,7 +239,7 @@ export function BookingWidget({
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-zinc-100">{service.name}</p>
                 <p className="text-xs text-zinc-500">
-                  {service.duration} min · ${fmtPrice(service.price)}
+                  {service.duration} min · {formatMoney(service.price, business.currency)}
                   {step === 2 && date && selectedSlot && (
                     <> · <span className="text-zinc-400">{format(new Date(date + "T00:00:00"), "EEE, MMM d")} at {fmtTime(selectedSlot)}</span></>
                   )}
@@ -459,7 +455,7 @@ export function BookingWidget({
                 {/* Amount due */}
                 <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
                   <p className="text-sm text-zinc-400">Amount due</p>
-                  <p className="text-xl font-bold text-zinc-100">${fmtPrice(service.price)}</p>
+                  <p className="text-xl font-bold text-zinc-100">{formatMoney(service.price, business.currency)}</p>
                 </div>
 
                 {/* Payment method tabs */}

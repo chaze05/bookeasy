@@ -35,6 +35,8 @@ export interface Business {
   slug: string;
   description: string | null;
   logo_url: string | null;
+  contact_email: string | null;
+  currency: string;
   timezone: string;
   // Booking settings (migration_001)
   allow_multiple_bookings: boolean;

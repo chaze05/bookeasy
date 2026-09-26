@@ -4,10 +4,11 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatMoney } from "@/lib/utils";
 import { BookingWidget, type BookingService, type PaymentMethodData } from "./booking-widget";
 
 interface ServicesSectionProps {
-  business: { id: string; name: string };
+  business: { id: string; name: string; currency?: string };
   services: BookingService[];
   paymentMethods?: PaymentMethodData[];
 }
@@ -25,10 +26,6 @@ const item = {
     transition: { type: "spring" as const, stiffness: 300, damping: 28 },
   },
 };
-
-function fmtPrice(price: number) {
-  return price % 1 === 0 ? price.toFixed(0) : price.toFixed(2);
-}
 
 export function ServicesSection({ business, services, paymentMethods = [] }: ServicesSectionProps) {
   const [selected, setSelected] = useState<BookingService | null>(null);
@@ -101,7 +98,7 @@ export function ServicesSection({ business, services, paymentMethods = [] }: Ser
                 <div className="mt-6 flex items-end justify-between">
                   <div className="flex flex-col gap-1">
                     <span className="text-3xl font-bold text-zinc-100">
-                      ${fmtPrice(svc.price)}
+                      {formatMoney(svc.price, business.currency)}
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-zinc-600">
                       <Clock className="h-3.5 w-3.5" />

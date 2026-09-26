@@ -16,15 +16,22 @@ export function ResetPasswordButton({ userId, userName }: ResetPasswordButtonPro
 
   function handleReset() {
     const confirmed = window.confirm(
-      `Reset ${userName}'s password to "password"?`
+      `Reset ${userName}'s password? A new temporary password will be generated.`
     );
 
     if (!confirmed) return;
 
     startTransition(async () => {
       try {
-        await resetUserPassword(userId);
-        toast.success("Password reset to password");
+        const temporaryPassword = await resetUserPassword(userId);
+        try {
+          await navigator.clipboard.writeText(temporaryPassword);
+        } catch {
+          // Clipboard may be unavailable — the toast still shows the password.
+        }
+        toast.success(`New password for ${userName}: ${temporaryPassword} (copied to clipboard)`, {
+          duration: 60000,
+        });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to reset password");
       }

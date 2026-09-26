@@ -1,28 +1,35 @@
 /**
- * Seed script — creates three auth accounts (superadmin + 2 business owners)
- * with separate businesses, services, staff, and bookings.
+ * Seed script — creates three demo auth accounts (superadmin + 2 business
+ * owners) with separate businesses, services, staff, and bookings.
  *
- * Accounts created:
- *   admin@bookeasy.app        / Admin123!   → superadmin
- *   owner@glowbeauty.com      / Owner123!   → owner of Glow Beauty Studio
- *   owner@fitzonefit.com      / Owner123!   → owner of FitZone Performance
+ * Passwords are generated on first run and printed once, or can be supplied
+ * via SEED_ADMIN_PASSWORD / SEED_OWNER_PASSWORD. Existing accounts are left
+ * untouched — use scripts/rotate-demo-passwords.mjs to rotate them.
  *
  * Run: npm run seed
  */
 import { PrismaClient } from "../src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import { randomBytes } from "crypto";
 import * as dotenv from "dotenv";
+import { getZonedDateKey, zonedTimeToUtc } from "../src/lib/timezone";
 
 dotenv.config();
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+const SEED_TIMEZONE = "Asia/Manila";
+
+function generatePassword(length = 16) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  return Array.from(randomBytes(length), (b) => alphabet[b % alphabet.length]).join("");
+}
+
 function daysFromNow(d: number, h = 9, m = 0) {
-  const dt = new Date();
-  dt.setDate(dt.getDate() + d);
-  dt.setHours(h, m, 0, 0);
-  return dt;
+  const dateKey = getZonedDateKey(new Date(Date.now() + d * 86_400_000), SEED_TIMEZONE);
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return zonedTimeToUtc(year, month, day, h, m, SEED_TIMEZONE);
 }
 
 function addMinutes(date: Date, mins: number) {
@@ -64,11 +71,11 @@ async function upsertAuthUser(
   email: string,
   password: string,
   existingUsers: Array<{ id: string; email: string }>
-): Promise<{ id: string; email: string }> {
+): Promise<{ id: string; email: string; created: boolean; password?: string }> {
   const existing = existingUsers.find((u) => u.email === email);
   if (existing) {
-    console.log(`  → ${email} already exists`);
-    return existing;
+    console.log(`  → ${email} already exists (password unchanged)`);
+    return { ...existing, created: false };
   }
 
   const { url, headers } = adminHeaders();
@@ -80,7 +87,7 @@ async function upsertAuthUser(
   const data = (await res.json()) as { id?: string; email?: string; message?: string };
   if (!data.id) throw new Error(`Failed to create ${email}: ${data.message ?? JSON.stringify(data)}`);
   console.log(`  → created ${email}`);
-  return { id: data.id, email: data.email! };
+  return { id: data.id, email: data.email!, created: true, password };
 }
 
 // ─── main ────────────────────────────────────────────────────────────────────
@@ -100,9 +107,21 @@ async function main() {
     const existing = await listAuthUsers();
 
     const [adminUser, glowOwner, fitzoneOwner] = await Promise.all([
-      upsertAuthUser("admin@bookeasy.app",   "Admin123!", existing),
-      upsertAuthUser("owner@glowbeauty.com", "Owner123!", existing),
-      upsertAuthUser("owner@fitzonefit.com", "Owner123!", existing),
+      upsertAuthUser(
+        "admin@bookeasy.app",
+        process.env.SEED_ADMIN_PASSWORD ?? generatePassword(),
+        existing
+      ),
+      upsertAuthUser(
+        "owner@glowbeauty.com",
+        process.env.SEED_OWNER_PASSWORD ?? generatePassword(),
+        existing
+      ),
+      upsertAuthUser(
+        "owner@fitzonefit.com",
+        process.env.SEED_OWNER_PASSWORD ?? generatePassword(),
+        existing
+      ),
     ]);
 
     // ── 2. Profiles ──────────────────────────────────────────────────────────
@@ -130,13 +149,14 @@ async function main() {
     console.log("\n💅 Glow Beauty Studio");
     const biz1 = await prisma.business.upsert({
       where: { slug: "glow-beauty-studio" },
-      update: { owner_id: glowOwner.id },
+      update: { owner_id: glowOwner.id, timezone: SEED_TIMEZONE, currency: "PHP" },
       create: {
         owner_id: glowOwner.id,
         name: "Glow Beauty Studio",
         slug: "glow-beauty-studio",
         description: "Premium hair, skin & nail care in the heart of the city.",
-        timezone: "America/New_York",
+        timezone: SEED_TIMEZONE,
+        currency: "PHP",
         booking_interval: 30,
         business_hours_start: "09:00",
         business_hours_end: "19:00",
@@ -210,13 +230,14 @@ async function main() {
     console.log("\n🏋️  FitZone Performance");
     const biz2 = await prisma.business.upsert({
       where: { slug: "fitzone-performance" },
-      update: { owner_id: fitzoneOwner.id },
+      update: { owner_id: fitzoneOwner.id, timezone: SEED_TIMEZONE, currency: "PHP" },
       create: {
         owner_id: fitzoneOwner.id,
         name: "FitZone Performance",
         slug: "fitzone-performance",
         description: "Elite personal training & group fitness coaching.",
-        timezone: "America/Los_Angeles",
+        timezone: SEED_TIMEZONE,
+        currency: "PHP",
         booking_interval: 60,
         business_hours_start: "06:00",
         business_hours_end: "21:00",
@@ -285,20 +306,29 @@ async function main() {
     }
     console.log("  ✓ 15 bookings");
 
+    const accounts = [
+      ["Superadmin ", adminUser],
+      ["Glow owner ", glowOwner],
+      ["Fitzone    ", fitzoneOwner],
+    ] as const;
+
     console.log(`
 ✅ Seed complete!
 
-┌─────────────────────────────────────────────────────────────┐
-│  Test Accounts                                              │
-├─────────────────────────────────────────────────────────────┤
-│  Superadmin  admin@bookeasy.app        Admin123!            │
-│  Glow owner  owner@glowbeauty.com      Owner123!            │
-│  Fitzone     owner@fitzonefit.com      Owner123!            │
-├─────────────────────────────────────────────────────────────┤
-│  /glow-beauty-studio   — public booking page                │
-│  /fitzone-performance  — public booking page                │
-│  /superadmin           — platform admin panel               │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Test Accounts                                                           │
+├──────────────────────────────────────────────────────────────────────────┤`);
+    for (const [label, account] of accounts) {
+      const detail = account.created
+        ? `/ ${account.password}  (shown once — save it now)`
+        : "(existing account — password unchanged)";
+      console.log(`│  ${label} ${account.email.padEnd(24)} ${detail}`);
+    }
+    console.log(`├──────────────────────────────────────────────────────────────────────────┤
+│  /glow-beauty-studio   — public booking page                             │
+│  /fitzone-performance  — public booking page                             │
+│  /superadmin           — platform admin panel                            │
+└──────────────────────────────────────────────────────────────────────────┘
 `);
   } finally {
     await prisma.$disconnect();

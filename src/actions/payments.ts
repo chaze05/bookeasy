@@ -1,14 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
+import { uploadPaymentProof } from "@/lib/storage";
 
 export type PaymentType = "stripe" | "gcash" | "maya" | "wise" | "bank_transfer" | "cash";
-const PAYMENT_PROOF_BUCKET = "payment-proofs";
-const MAX_PROOF_SIZE = 5 * 1024 * 1024;
+const PAYMENT_TYPES: PaymentType[] = ["stripe", "gcash", "maya", "wise", "bank_transfer", "cash"];
 
 export interface PaymentMethodConfig {
   id?: string;
@@ -75,9 +74,12 @@ export async function getAllPaymentMethodsAdmin() {
 export async function upsertPaymentMethod(data: PaymentMethodConfig) {
   await assertBusinessOwner(data.business_id);
 
+  if (!PAYMENT_TYPES.includes(data.type)) throw new Error("Invalid payment method type");
+  if (!data.label?.trim()) throw new Error("Payment method label is required");
+
   if (data.id) {
-    await prisma.paymentMethod.update({
-      where: { id: data.id },
+    const result = await prisma.paymentMethod.updateMany({
+      where: { id: data.id, business_id: data.business_id },
       data: {
         label: data.label,
         is_enabled: data.is_enabled,
@@ -86,6 +88,7 @@ export async function upsertPaymentMethod(data: PaymentMethodConfig) {
         updated_at: new Date(),
       },
     });
+    if (result.count === 0) throw new Error("Payment method not found");
   } else {
     await prisma.paymentMethod.create({
       data: {
@@ -103,7 +106,10 @@ export async function upsertPaymentMethod(data: PaymentMethodConfig) {
 
 export async function deletePaymentMethod(id: string, businessId: string) {
   await assertBusinessOwner(businessId);
-  await prisma.paymentMethod.delete({ where: { id } });
+  const result = await prisma.paymentMethod.deleteMany({
+    where: { id, business_id: businessId },
+  });
+  if (result.count === 0) throw new Error("Payment method not found");
   revalidatePath("/dashboard/settings");
 }
 
@@ -263,49 +269,3 @@ function getPaymentDetailKeys(type: string) {
   return ["publishable_key", "payment_link", "webhook_endpoint"];
 }
 
-export async function uploadPaymentProof(pathPrefix: string, file: File) {
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Payment proof must be an image.");
-  }
-  if (file.size > MAX_PROOF_SIZE) {
-    throw new Error("Payment proof must be 5MB or smaller.");
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Payment proof upload is not configured.");
-  }
-
-  const supabaseAdmin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  const { data: bucket } = await supabaseAdmin.storage.getBucket(PAYMENT_PROOF_BUCKET);
-  if (!bucket) {
-    const { error: bucketError } = await supabaseAdmin.storage.createBucket(PAYMENT_PROOF_BUCKET, {
-      public: true,
-      fileSizeLimit: MAX_PROOF_SIZE,
-      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    });
-    if (bucketError) throw bucketError;
-  }
-
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${pathPrefix}/proof-${Date.now()}.${extension}`;
-  const { error } = await supabaseAdmin.storage
-    .from(PAYMENT_PROOF_BUCKET)
-    .upload(path, file, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (error) throw error;
-
-  const { data } = supabaseAdmin.storage.from(PAYMENT_PROOF_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
-}

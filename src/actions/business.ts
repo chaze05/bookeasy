@@ -28,16 +28,23 @@ export async function updateBusiness(id: string, formData: FormData) {
     name: formData.get("name"),
     slug: formData.get("slug"),
     description: formData.get("description"),
+    contact_email: formData.get("contact_email"),
+    currency: formData.get("currency"),
     timezone: formData.get("timezone"),
     logo_url: formData.get("logo_url"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
-  const { logo_url, ...rest } = parsed.data;
+  const { logo_url, contact_email, ...rest } = parsed.data;
 
   const result = await prisma.business.updateMany({
     where: { id, owner_id: user.id },
-    data: { ...rest, logo_url: logo_url || null, updated_at: new Date() },
+    data: {
+      ...rest,
+      contact_email: contact_email || null,
+      logo_url: logo_url || null,
+      updated_at: new Date(),
+    },
   });
   if (result.count === 0) throw new Error("Business not found");
 
@@ -54,15 +61,22 @@ export async function createBusiness(formData: FormData) {
     name: formData.get("name"),
     slug: formData.get("slug"),
     description: formData.get("description"),
+    contact_email: formData.get("contact_email"),
+    currency: formData.get("currency"),
     timezone: formData.get("timezone"),
     logo_url: formData.get("logo_url"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
-  const { logo_url, ...rest } = parsed.data;
+  const { logo_url, contact_email, ...rest } = parsed.data;
 
   await prisma.business.create({
-    data: { owner_id: user.id, ...rest, logo_url: logo_url || null },
+    data: {
+      owner_id: user.id,
+      ...rest,
+      contact_email: contact_email || null,
+      logo_url: logo_url || null,
+    },
   });
 
   revalidatePath("/dashboard");

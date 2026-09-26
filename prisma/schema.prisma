@@ -21,6 +21,8 @@ model Business {
   slug                    String   @unique
   description             String?
   logo_url                String?
+  contact_email           String?
+  currency                String   @default("PHP")
   timezone                String   @default("UTC")
   allow_multiple_bookings Boolean  @default(false)
   max_bookings_per_slot   Int      @default(1)

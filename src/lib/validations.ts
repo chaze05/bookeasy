@@ -32,7 +32,14 @@ export const businessSchema = z.object({
       "URL slug can only contain lowercase letters, numbers, and hyphens"
     ),
   description: z.string().optional(),
-  timezone: z.string().default("UTC"),
+  contact_email: z
+    .string()
+    .email("Enter a valid contact email")
+    .optional()
+    .or(z.literal("")),
+  currency: z
+    .enum(["PHP", "USD", "EUR", "GBP", "AUD", "SGD", "CAD", "JPY", "AED"]),
+  timezone: z.string().min(1, "Timezone is required"),
   logo_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 

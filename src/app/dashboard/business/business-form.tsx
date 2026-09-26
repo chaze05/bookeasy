@@ -16,16 +16,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 const TIMEZONES = [
-  "UTC",
+  "Asia/Manila",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Asia/Dubai",
+  "Australia/Sydney",
+  "Europe/London",
+  "Europe/Paris",
   "America/New_York",
   "America/Chicago",
   "America/Denver",
   "America/Los_Angeles",
-  "Europe/London",
-  "Europe/Paris",
-  "Asia/Tokyo",
-  "Australia/Sydney",
+  "UTC",
 ];
+
+const CURRENCIES = ["PHP", "USD", "EUR", "GBP", "AUD", "SGD", "CAD", "JPY", "AED"] as const;
 
 interface BusinessFormProps {
   business: Business | null;
@@ -41,12 +46,14 @@ export function BusinessForm({ business }: BusinessFormProps) {
     watch,
     formState: { errors, isDirty },
   } = useForm<BusinessInput>({
-    resolver: zodResolver(businessSchema) as any,
+    resolver: zodResolver(businessSchema),
     defaultValues: {
       name: business?.name ?? "",
       slug: business?.slug ?? "",
       description: business?.description ?? "",
-      timezone: business?.timezone ?? "UTC",
+      contact_email: business?.contact_email ?? "",
+      currency: (business?.currency as (typeof CURRENCIES)[number]) ?? "PHP",
+      timezone: business?.timezone ?? "Asia/Manila",
       logo_url: business?.logo_url ?? "",
     },
   });
@@ -129,6 +136,36 @@ export function BusinessForm({ business }: BusinessFormProps) {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Contact email for booking notifications</Label>
+            <Input
+              type="email"
+              placeholder="bookings@yourbusiness.com"
+              className={inputClass}
+              {...register("contact_email")}
+            />
+            {errors.contact_email && (
+              <p className="text-xs text-red-400">{errors.contact_email.message}</p>
+            )}
+            <p className="text-xs text-zinc-600">
+              New booking alerts are sent here. Defaults to your account email when empty.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Currency</Label>
+            <select
+              {...register("currency")}
+              className="h-8 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+            >
+              {CURRENCIES.map((currency) => (
+                <option key={currency} value={currency} className="bg-zinc-800">
+                  {currency}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label className="text-zinc-300">Timezone</Label>
             <select
               {...register("timezone")}
@@ -140,6 +177,9 @@ export function BusinessForm({ business }: BusinessFormProps) {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-zinc-600">
+              All booking times and customer emails use this timezone.
+            </p>
           </div>
         </div>
       </div>

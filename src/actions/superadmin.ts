@@ -11,7 +11,12 @@ export type SuperadminUser = Profile & {
   email: string | null;
 };
 
-const DEFAULT_RESET_PASSWORD = "password";
+function generateTemporaryPassword(length = 14): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
 
 async function assertSuperadmin() {
   const supabase = await createClient();
@@ -161,7 +166,7 @@ export async function updateUserRole(userId: string, role: UserRole) {
   revalidatePath("/superadmin/users");
 }
 
-export async function resetUserPassword(userId: string) {
+export async function resetUserPassword(userId: string): Promise<string> {
   await assertSuperadmin();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -185,13 +190,15 @@ export async function resetUserPassword(userId: string) {
     },
   });
 
+  const temporaryPassword = generateTemporaryPassword();
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: DEFAULT_RESET_PASSWORD,
+    password: temporaryPassword,
   });
 
   if (error) throw error;
 
   revalidatePath("/superadmin/users");
+  return temporaryPassword;
 }
 
 export async function getSuperadminDashboardData() {

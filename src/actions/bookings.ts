@@ -3,8 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { uploadPaymentProof } from "@/actions/payments";
-import { sendBookingReceivedEmail, sendBookingApprovedEmail } from "@/lib/email";
+import { uploadPaymentProof } from "@/lib/storage";
+import {
+  sendBookingReceivedEmail,
+  sendBookingApprovedEmail,
+  sendOwnerNewBookingEmail,
+} from "@/lib/email";
+import { getAppBaseUrl, getBusinessNotificationEmail } from "@/lib/notify";
+import { buildBookingActionUrl } from "@/lib/booking-tokens";
+import {
+  formatZonedDate,
+  formatZonedTime,
+  getZonedDateKey,
+  getZonedDayRange,
+  getZonedMinutes,
+  safeTimeZone,
+  zonedTimeToUtc,
+} from "@/lib/timezone";
 import type { BookingStatus } from "@/types";
 
 export async function getAvailableSlots(
@@ -12,6 +27,8 @@ export async function getAvailableSlots(
   serviceId: string,
   dateStr: string
 ): Promise<string[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return [];
+
   const [business, service] = await Promise.all([
     prisma.business.findUnique({
       where: { id: businessId },
@@ -20,23 +37,31 @@ export async function getAvailableSlots(
         business_hours_end: true,
         booking_interval: true,
         max_bookings_per_slot: true,
+        timezone: true,
       },
     }),
     prisma.service.findUnique({
-      where: { id: serviceId },
+      where: { id: serviceId, business_id: businessId, is_active: true },
       select: { duration: true },
     }),
   ]);
   if (!business || !service) return [];
 
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const dayStart = new Date(year, month - 1, day, 0, 0, 0);
-  const dayEnd = new Date(year, month - 1, day, 23, 59, 59);
+  const timeZone = safeTimeZone(business.timezone);
+  const todayKey = getZonedDateKey(new Date(), timeZone);
+  if (dateStr < todayKey) return [];
+
+  let dayRange: { start: Date; end: Date };
+  try {
+    dayRange = getZonedDayRange(dateStr, timeZone);
+  } catch {
+    return [];
+  }
 
   const existingBookings = await prisma.booking.findMany({
     where: {
       business_id: businessId,
-      starts_at: { gte: dayStart, lte: dayEnd },
+      starts_at: { gte: dayRange.start, lt: dayRange.end },
       status: { not: "cancelled" },
     },
     select: { starts_at: true },
@@ -50,18 +75,13 @@ export async function getAvailableSlots(
   const maxPerSlot = business.max_bookings_per_slot;
 
   const slotCounts = new Map<number, number>();
-  for (const b of existingBookings) {
-    const d = new Date(b.starts_at);
-    const slotMin = d.getHours() * 60 + d.getMinutes();
+  for (const booking of existingBookings) {
+    const slotMin = getZonedMinutes(new Date(booking.starts_at), timeZone);
     slotCounts.set(slotMin, (slotCounts.get(slotMin) ?? 0) + 1);
   }
 
-  const now = new Date();
-  const isToday =
-    now.getFullYear() === year &&
-    now.getMonth() + 1 === month &&
-    now.getDate() === day;
-  const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : 0;
+  const isToday = dateStr === todayKey;
+  const nowMinutes = isToday ? getZonedMinutes(new Date(), timeZone) : -1;
 
   const slots: string[] = [];
   for (let t = startMinutes; t + service.duration <= endMinutes; t += interval) {
@@ -94,15 +114,26 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
     throw new Error("Invalid email address.");
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !/^\d{2}:\d{2}$/.test(timeStr)) {
+    throw new Error("Invalid date or time.");
+  }
 
   const [business, service, enabledPaymentMethods] = await Promise.all([
     prisma.business.findUnique({
       where: { id: businessId, status: "active" },
-      select: { name: true, max_bookings_per_slot: true },
+      select: {
+        name: true,
+        contact_email: true,
+        timezone: true,
+        max_bookings_per_slot: true,
+        business_hours_start: true,
+        business_hours_end: true,
+        booking_interval: true,
+      },
     }),
     prisma.service.findUnique({
       where: { id: serviceId, business_id: businessId, is_active: true },
-      select: { name: true, duration: true },
+      select: { name: true, duration: true, price: true },
     }),
     prisma.paymentMethod.findMany({
       where: { business_id: businessId, is_enabled: true },
@@ -125,17 +156,25 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
 
   const [year, month, day] = dateStr.split("-").map(Number);
   const [hour, minute] = timeStr.split(":").map(Number);
-  const startsAt = new Date(year, month - 1, day, hour, minute, 0);
-  const endsAt = new Date(startsAt.getTime() + service.duration * 60 * 1000);
+  if (hour > 23 || minute > 59) throw new Error("Invalid time.");
 
-  if (startsAt <= new Date()) throw new Error("Cannot book in the past.");
+  const timeZone = safeTimeZone(business.timezone);
 
-  const conflictCount = await prisma.booking.count({
-    where: { business_id: businessId, starts_at: startsAt, status: { not: "cancelled" } },
-  });
-  if (conflictCount >= business.max_bookings_per_slot) {
-    throw new Error("This slot is no longer available. Please choose another time.");
+  const [startHour, startMin] = business.business_hours_start.split(":").map(Number);
+  const [endHour, endMin] = business.business_hours_end.split(":").map(Number);
+  const requestedMinutes = hour * 60 + minute;
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+  if (requestedMinutes < startMinutes || requestedMinutes + service.duration > endMinutes) {
+    throw new Error("That time is outside business hours.");
   }
+  if ((requestedMinutes - startMinutes) % business.booking_interval !== 0) {
+    throw new Error("Please choose an available time slot.");
+  }
+
+  const startsAt = zonedTimeToUtc(year, month, day, hour, minute, timeZone);
+  const endsAt = new Date(startsAt.getTime() + service.duration * 60_000);
+  if (startsAt <= new Date()) throw new Error("Cannot book in the past.");
 
   const bookingId = crypto.randomUUID();
   const paymentProofUrl =
@@ -143,32 +182,81 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
       ? await uploadPaymentProof(bookingId, paymentProof)
       : null;
 
-  await prisma.booking.create({
-    data: {
-      id: bookingId,
-      business_id: businessId,
-      service_id: serviceId,
-      customer_name: customerName,
-      customer_email: customerEmail,
-      customer_phone: customerPhone,
-      payment_method_id: requiresPaymentProof ? paymentMethodId : null,
-      payment_proof_url: paymentProofUrl,
-      notes,
-      starts_at: startsAt,
-      ends_at: endsAt,
-      status: "pending",
-    },
+  // Serialize per (business, slot) so concurrent requests cannot both pass the
+  // capacity check and double-book the last remaining slot.
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`select pg_advisory_xact_lock(hashtext(${businessId}), hashtext(${startsAt.toISOString()}))`;
+
+    const conflictCount = await tx.booking.count({
+      where: {
+        business_id: businessId,
+        starts_at: startsAt,
+        status: { not: "cancelled" },
+      },
+    });
+    if (conflictCount >= business.max_bookings_per_slot) {
+      throw new Error("This slot is no longer available. Please choose another time.");
+    }
+
+    await tx.booking.create({
+      data: {
+        id: bookingId,
+        business_id: businessId,
+        service_id: serviceId,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        payment_method_id: requiresPaymentProof ? paymentMethodId : null,
+        payment_proof_url: paymentProofUrl,
+        notes,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        status: "pending",
+      },
+    });
   });
 
-  // Dispatch email notification without blocking
-  void sendBookingReceivedEmail({
-    to: customerEmail,
-    customerName,
-    businessName: business.name,
-    serviceName: service.name,
-    date: startsAt.toLocaleDateString(),
-    time: timeStr,
-  });
+  const dateLabel = formatZonedDate(startsAt, timeZone, { dateStyle: "long" });
+  const timeLabel = formatZonedTime(startsAt, timeZone);
+
+  const emailJobs: Promise<unknown>[] = [
+    sendBookingReceivedEmail({
+      to: customerEmail,
+      businessEmail: business.contact_email ?? undefined,
+      customerName,
+      businessName: business.name,
+      serviceName: service.name,
+      date: dateLabel,
+      time: timeLabel,
+    }),
+  ];
+
+  try {
+    const ownerEmail = await getBusinessNotificationEmail(businessId);
+    if (ownerEmail) {
+      const baseUrl = await getAppBaseUrl();
+      emailJobs.push(
+        sendOwnerNewBookingEmail({
+          to: ownerEmail,
+          businessName: business.name,
+          customerName,
+          customerEmail,
+          customerPhone,
+          serviceName: service.name,
+          price: Number(service.price).toFixed(2),
+          date: dateLabel,
+          time: timeLabel,
+          notes,
+          confirmUrl: buildBookingActionUrl(baseUrl, bookingId, "confirm"),
+          declineUrl: buildBookingActionUrl(baseUrl, bookingId, "decline"),
+        })
+      );
+    }
+  } catch (error) {
+    console.error("Failed to prepare owner notification email:", error);
+  }
+
+  await Promise.allSettled(emailJobs);
 }
 
 export async function updateBookingStatus(id: string, status: BookingStatus) {
@@ -193,19 +281,21 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
     const bookingDetails = await prisma.booking.findUnique({
       where: { id },
       include: {
-        business: { select: { name: true } },
+        business: { select: { name: true, timezone: true, contact_email: true } },
         service: { select: { name: true } },
       }
     });
 
     if (bookingDetails && bookingDetails.customer_email) {
-      void sendBookingApprovedEmail({
+      const timeZone = safeTimeZone(bookingDetails.business.timezone);
+      await sendBookingApprovedEmail({
         to: bookingDetails.customer_email,
+        businessEmail: bookingDetails.business.contact_email ?? undefined,
         customerName: bookingDetails.customer_name,
         businessName: bookingDetails.business.name,
         serviceName: bookingDetails.service.name,
-        date: bookingDetails.starts_at.toLocaleDateString(),
-        time: bookingDetails.starts_at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: formatZonedDate(bookingDetails.starts_at, timeZone, { dateStyle: "long" }),
+        time: formatZonedTime(bookingDetails.starts_at, timeZone),
       });
     }
   }
@@ -244,16 +334,16 @@ export async function completeBookingWithPayment(formData: FormData) {
     throw new Error("Please upload proof of payment.");
   }
 
-  const paymentProofUrl =
-    proof instanceof File && proof.size > 0
-      ? await uploadPaymentProof(bookingId, proof)
-      : null;
-
   const existingBooking = await prisma.booking.findFirst({
     where: { id: bookingId, business_id: business.id },
     select: { notes: true },
   });
   if (!existingBooking) throw new Error("Booking not found");
+
+  const paymentProofUrl =
+    proof instanceof File && proof.size > 0
+      ? await uploadPaymentProof(bookingId, proof)
+      : null;
 
   const notes = paymentNotes
     ? [existingBooking.notes, `Payment note: ${paymentNotes}`].filter(Boolean).join("\n")
