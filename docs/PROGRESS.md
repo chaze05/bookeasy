@@ -10,6 +10,10 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Email provider selection + production smoke test
+- `EMAIL_PROVIDER=brevo` now makes Brevo the primary sender with Resend as fallback (default remains Resend-first). Set in Vercel to use the working Brevo account.
+- Smoke-tested https://bookeasyapp.vercel.app: homepage pricing section renders (₱999 / ₱1,999 / "Most popular"), `/api/keepalive` returns success with 1 row, `/glow-beauty-studio` renders live data, PayMongo webhook route reachable (400 on invalid payload).
+
 ### 2026-09-26 — PayMongo online payments (per-business accounts)
 - `migration_012.sql` applied live: `businesses.paymongo_enabled`, `paymongo_secret_key_encrypted`, `paymongo_webhook_secret_encrypted`; `bookings.payment_status` (`unpaid/deposit_paid/paid/refunded`); new `payments` table (RLS on, server-only); `payment_methods` type check now allows `paymongo`.
 - `src/lib/crypto.ts` — AES-256-GCM at-rest encryption for stored secret keys (key from `PAYMENTS_ENCRYPTION_KEY`, fallback derived from the service-role key).

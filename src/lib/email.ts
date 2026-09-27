@@ -7,6 +7,9 @@ import { OwnerBookingNotificationEmail } from "@/components/emails/OwnerBookingN
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.NEXT_PUBLIC_FROM_EMAIL || "bookings@bookeasy.app";
+// "brevo" makes Brevo the primary sender (Resend becomes the fallback).
+// Default: Resend first when configured, otherwise Brevo.
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER ?? "").toLowerCase();
 
 /** Prevents CRLF header injection via user-controlled display names. */
 function safeHeaderValue(value: string): string {
@@ -96,14 +99,10 @@ async function sendEmailWithBrevo({
   }
 }
 
-/** Sends via Resend, falling back to Brevo. Never throws. */
+/** Sends via the preferred provider, falling back to the other. Never throws. */
 async function deliverEmail({ from, replyTo, to, subject, reactElement }: DeliveryOptions): Promise<boolean> {
-  let fallbackNeeded = false;
-
-  if (!resend) {
-    console.log("No RESEND_API_KEY or Resend client, attempting fallback to Brevo immediately");
-    fallbackNeeded = true;
-  } else {
+  async function tryResend(): Promise<boolean> {
+    if (!resend) return false;
     try {
       const result = await resend.emails.send({
         from,
@@ -117,32 +116,36 @@ async function deliverEmail({ from, replyTo, to, subject, reactElement }: Delive
         console.warn(
           `Resend failed to send "${subject}": ${result.error.name} - ${result.error.message} (status: ${result.error.statusCode})`
         );
-        fallbackNeeded = true;
-      } else {
-        return true;
+        return false;
       }
+      return true;
     } catch (error) {
       console.error(`Exception thrown when sending "${subject}" via Resend:`, error);
-      fallbackNeeded = true;
-    }
-  }
-
-  if (fallbackNeeded) {
-    console.log("Triggering Brevo fallback...");
-    try {
-      const html = await render(reactElement);
-      const success = await sendEmailWithBrevo({ from, replyTo, to, subject, html });
-      if (!success) {
-        console.error("Fallback to Brevo also failed.");
-      }
-      return success;
-    } catch (renderError) {
-      console.error("Failed to render email for Brevo fallback:", renderError);
       return false;
     }
   }
 
-  return false;
+  async function tryBrevo(): Promise<boolean> {
+    try {
+      const html = await render(reactElement);
+      const success = await sendEmailWithBrevo({ from, replyTo, to, subject, html });
+      if (!success) {
+        console.error(`Brevo failed to send "${subject}".`);
+      }
+      return success;
+    } catch (renderError) {
+      console.error("Failed to render email for Brevo:", renderError);
+      return false;
+    }
+  }
+
+  if (EMAIL_PROVIDER === "brevo") {
+    if (await tryBrevo()) return true;
+    return tryResend();
+  }
+
+  if (await tryResend()) return true;
+  return tryBrevo();
 }
 
 export async function sendBookingReceivedEmail({
