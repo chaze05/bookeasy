@@ -95,6 +95,11 @@ export default async function BookingPage({
           ...m,
           details: m.details as Record<string, string> | null,
         }))}
+        staff={business.staff.map((s) => ({
+          id: s.id,
+          full_name: s.full_name,
+          avatar_url: s.avatar_url,
+        }))}
       />
 
       <StaffSection staff={business.staff} />

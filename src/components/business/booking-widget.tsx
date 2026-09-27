@@ -60,6 +60,7 @@ interface BookingWidgetProps {
   };
   service: BookingService;
   paymentMethods?: PaymentMethodData[];
+  staff?: { id: string; full_name: string; avatar_url: string | null }[];
 }
 
 const PAYMENT_ICONS: Record<string, React.ElementType> = {
@@ -115,6 +116,7 @@ export function BookingWidget({
   business,
   service,
   paymentMethods = [],
+  staff = [],
 }: BookingWidgetProps) {
   const hasPayment = paymentMethods.length > 0;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -124,6 +126,7 @@ export function BookingWidget({
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
@@ -136,6 +139,7 @@ export function BookingWidget({
     setDate("");
     setSlots([]);
     setSelectedSlot("");
+    setSelectedStaffId("");
     setForm({ name: "", email: "", phone: "", notes: "" });
     setSelectedPaymentType(paymentMethods[0]?.type ?? null);
     setPaymentProof(null);
@@ -146,17 +150,29 @@ export function BookingWidget({
     if (!v) setTimeout(reset, 300);
   }
 
+  async function loadSlots(nextDate: string, staffId: string) {
+    setSlotsLoading(true);
+    try {
+      setSlots(await getAvailableSlots(business.id, service.id, nextDate, staffId || null));
+    } finally {
+      setSlotsLoading(false);
+    }
+  }
+
   async function handleDateChange(d: string) {
     setDate(d);
     setSelectedSlot("");
     setSlots([]);
     if (!d) return;
-    setSlotsLoading(true);
-    try {
-      setSlots(await getAvailableSlots(business.id, service.id, d));
-    } finally {
-      setSlotsLoading(false);
-    }
+    await loadSlots(d, selectedStaffId);
+  }
+
+  function handleStaffChange(staffId: string) {
+    setSelectedStaffId(staffId);
+    setSelectedSlot("");
+    if (!date) return;
+    setSlots([]);
+    void loadSlots(date, staffId);
   }
 
   function submitBooking(proof: File | null) {
@@ -171,6 +187,7 @@ export function BookingWidget({
       fd.append("customerPhone", form.phone);
       fd.append("notes", form.notes);
       if (activePaymentMethod) fd.append("paymentMethodId", activePaymentMethod.id);
+      if (selectedStaffId) fd.append("staffId", selectedStaffId);
       if (proof) fd.append("paymentProof", proof);
       try {
         const result = await createPublicBooking(fd);
@@ -285,6 +302,44 @@ export function BookingWidget({
                 transition={{ duration: 0.16 }}
                 className="flex flex-col gap-5"
               >
+                {staff.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                      <User className="h-3.5 w-3.5 text-emerald-500" />
+                      Preferred staff
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleStaffChange("")}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                          selectedStaffId === ""
+                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-400"
+                            : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                        )}
+                      >
+                        Any available
+                      </button>
+                      {staff.map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => handleStaffChange(member.id)}
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                            selectedStaffId === member.id
+                              ? "border-emerald-500 bg-emerald-500/15 text-emerald-400"
+                              : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                          )}
+                        >
+                          {member.full_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <Label className="flex items-center gap-2 text-xs font-medium text-zinc-400">
                     <CalendarDays className="h-3.5 w-3.5 text-emerald-500" />

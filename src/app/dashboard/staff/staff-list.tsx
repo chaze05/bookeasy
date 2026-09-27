@@ -2,13 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Plus, Pencil, Trash2, Loader2, Users, Mail, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Users, Mail, CalendarDays, CalendarOff } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { createStaffMember, updateStaffMember, deleteStaffMember, toggleStaffMember } from "@/actions/staff";
+import {
+  createStaffMember,
+  updateStaffMember,
+  deleteStaffMember,
+  toggleStaffMember,
+  saveStaffAvailability,
+  addBlockedDate,
+  deleteBlockedDate,
+} from "@/actions/staff";
 import type { Staff } from "@/types";
 
 import { Button } from "@/components/ui/button";
@@ -115,13 +123,272 @@ function StaffForm({ defaultValues, onSubmit, onClose, isEdit }: StaffFormProps)
   );
 }
 
-interface StaffCardProps {
-  member: Staff;
+interface ScheduleRow {
+  id: string;
+  staff_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
 }
 
-function StaffCard({ member }: StaffCardProps) {
+interface BlockedRow {
+  id: string;
+  staff_id: string | null;
+  blocked_on: string;
+  reason: string | null;
+}
+
+type AvailabilityWindow = { day_of_week: number; start_time: string; end_time: string };
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function timeFromIso(iso: string): string {
+  return iso.length >= 16 ? iso.slice(11, 16) : "09:00";
+}
+
+function ScheduleEditor({
+  memberId,
+  initial,
+  onDone,
+}: {
+  memberId: string;
+  initial: ScheduleRow[];
+  onDone: () => void;
+}) {
+  const [windows, setWindows] = useState<AvailabilityWindow[]>(
+    initial.map((row) => ({
+      day_of_week: row.day_of_week,
+      start_time: timeFromIso(row.start_time),
+      end_time: timeFromIso(row.end_time),
+    }))
+  );
+  const [isPending, startTransition] = useTransition();
+
+  function update(index: number, patch: Partial<AvailabilityWindow>) {
+    setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, ...patch } : w)));
+  }
+
+  function save() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("windows", JSON.stringify(windows));
+      try {
+        await saveStaffAvailability(memberId, fd);
+        toast.success("Weekly schedule saved");
+        onDone();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to save schedule");
+      }
+    });
+  }
+
+  const inputClass =
+    "h-9 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none";
+
+  return (
+    <div className="flex flex-col gap-4">
+      {windows.length === 0 ? (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
+          No working hours set. Staff without a schedule fall back to your business hours.
+        </p>
+      ) : (
+        <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+          {windows.map((window, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <select
+                value={window.day_of_week}
+                onChange={(e) => update(index, { day_of_week: Number(e.target.value) })}
+                className={`${inputClass} flex-1`}
+              >
+                {DAY_NAMES.map((day, value) => (
+                  <option key={value} value={value} className="bg-zinc-900">
+                    {day}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={window.start_time}
+                onChange={(e) => update(index, { start_time: e.target.value })}
+                className={inputClass}
+              />
+              <span className="text-xs text-zinc-600">to</span>
+              <input
+                type="time"
+                value={window.end_time}
+                onChange={(e) => update(index, { end_time: e.target.value })}
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => setWindows((prev) => prev.filter((_, i) => i !== index))}
+                className="flex h-9 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() =>
+          setWindows((prev) => [...prev, { day_of_week: 1, start_time: "09:00", end_time: "17:00" }])
+        }
+        className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-zinc-700 px-2.5 text-xs text-zinc-300 hover:bg-zinc-800"
+      >
+        <Plus className="h-3 w-3" /> Add hours
+      </button>
+
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button variant="outline" type="button" className="border-zinc-700 text-zinc-300">
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button
+          type="button"
+          onClick={save}
+          disabled={isPending}
+          className="bg-emerald-500 text-white hover:bg-emerald-400"
+        >
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save schedule"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function TimeOffCard({ staff, blockedDates }: { staff: Staff[]; blockedDates: BlockedRow[] }) {
+  const [date, setDate] = useState("");
+  const [staffId, setStaffId] = useState("all");
+  const [reason, setReason] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  function add() {
+    if (!date) {
+      toast.error("Pick a date to block");
+      return;
+    }
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("blocked_on", date);
+      fd.set("staff_id", staffId);
+      fd.set("reason", reason);
+      try {
+        await addBlockedDate(fd);
+        toast.success("Day blocked");
+        setDate("");
+        setReason("");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to block day");
+      }
+    });
+  }
+
+  function remove(id: string) {
+    startTransition(async () => {
+      try {
+        await deleteBlockedDate(id);
+        toast.success("Block removed");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to remove");
+      }
+    });
+  }
+
+  const staffName = (id: string | null) =>
+    id ? (staff.find((s) => s.id === id)?.full_name ?? "Staff") : "Entire business";
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <CalendarOff className="h-4 w-4 text-zinc-500" />
+        <h2 className="text-sm font-semibold text-zinc-100">Days off / blocked dates</h2>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-zinc-400">Date</Label>
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full border-zinc-700 bg-zinc-800 text-zinc-100 [color-scheme:dark] sm:w-44"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-zinc-400">Applies to</Label>
+          <select
+            value={staffId}
+            onChange={(e) => setStaffId(e.target.value)}
+            className="h-9 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 text-sm text-zinc-100 focus:outline-none sm:w-48"
+          >
+            <option value="all" className="bg-zinc-800">
+              Entire business
+            </option>
+            {staff.map((member) => (
+              <option key={member.id} value={member.id} className="bg-zinc-800">
+                {member.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5 sm:flex-1">
+          <Label className="text-xs text-zinc-400">Reason (optional)</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Holiday, training…"
+            className="border-zinc-700 bg-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+          />
+        </div>
+        <Button
+          type="button"
+          onClick={add}
+          disabled={isPending}
+          className="gap-1.5 bg-emerald-500 text-white hover:bg-emerald-400"
+        >
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          Block
+        </Button>
+      </div>
+
+      {blockedDates.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-4">
+          {blockedDates.map((block) => (
+            <div key={block.id} className="flex items-center justify-between gap-3 text-sm">
+              <div className="min-w-0">
+                <span className="font-medium text-zinc-200">{block.blocked_on.slice(0, 10)}</span>
+                <span className="ml-2 text-xs text-zinc-500">{staffName(block.staff_id)}</span>
+                {block.reason && <span className="ml-2 text-xs text-zinc-600">· {block.reason}</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(block.id)}
+                disabled={isPending}
+                className="text-zinc-500 hover:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface StaffCardProps {
+  member: Staff;
+  availability: ScheduleRow[];
+}
+
+function StaffCard({ member, availability }: StaffCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const initials = member.full_name
@@ -194,6 +461,15 @@ function StaffCard({ member }: StaffCardProps) {
             <Button
               variant="ghost"
               size="icon-sm"
+              onClick={() => setScheduleOpen(true)}
+              className="text-zinc-500 hover:text-emerald-400"
+              title="Weekly schedule"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setEditOpen(true)}
               className="text-zinc-500 hover:text-zinc-100"
             >
@@ -237,6 +513,24 @@ function StaffCard({ member }: StaffCardProps) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Weekly schedule</DialogTitle>
+            <DialogDescription>
+              Working hours for {member.full_name}. Times outside these windows are not bookable.
+            </DialogDescription>
+          </DialogHeader>
+          {scheduleOpen && (
+            <ScheduleEditor
+              memberId={member.id}
+              initial={availability}
+              onDone={() => setScheduleOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -261,9 +555,22 @@ function StaffCard({ member }: StaffCardProps) {
 
 interface StaffListProps {
   staff: Staff[];
+  availability: {
+    id: string;
+    staff_id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
+  blockedDates: {
+    id: string;
+    staff_id: string | null;
+    blocked_on: string;
+    reason: string | null;
+  }[];
 }
 
-export function StaffList({ staff }: StaffListProps) {
+export function StaffList({ staff, availability, blockedDates }: StaffListProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -293,11 +600,17 @@ export function StaffList({ staff }: StaffListProps) {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence>
             {staff.map((member) => (
-              <StaffCard key={member.id} member={member} />
+              <StaffCard
+                key={member.id}
+                member={member}
+                availability={availability.filter((row) => row.staff_id === member.id)}
+              />
             ))}
           </AnimatePresence>
         </div>
       )}
+
+      <TimeOffCard staff={staff} blockedDates={blockedDates} />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>

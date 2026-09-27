@@ -17,6 +17,7 @@ interface ServicesSectionProps {
   };
   services: BookingService[];
   paymentMethods?: PaymentMethodData[];
+  staff?: { id: string; full_name: string; avatar_url: string | null }[];
 }
 
 const container = {
@@ -33,7 +34,7 @@ const item = {
   },
 };
 
-export function ServicesSection({ business, services, paymentMethods = [] }: ServicesSectionProps) {
+export function ServicesSection({ business, services, paymentMethods = [], staff = [] }: ServicesSectionProps) {
   const [selected, setSelected] = useState<BookingService | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -133,6 +134,7 @@ export function ServicesSection({ business, services, paymentMethods = [] }: Ser
           business={business}
           service={selected}
           paymentMethods={paymentMethods}
+          staff={staff}
         />
       )}
     </section>

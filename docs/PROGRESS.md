@@ -10,6 +10,13 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-27 — Staff booking, weekly schedules, days off (branch `feat/staff-booking-readiness`)
+- Staff-aware availability engine (`src/actions/bookings.ts`): `getAvailableSlots(..., staffId?)` now respects weekly availability windows, business-wide and per-staff blocked dates, existing staff bookings (interval overlap), inactive staff, and timezone-local slots. Falls back to business-hours/capacity when no staff are configured.
+- Customer booking flow: new optional staff picker ("Any available" + team list) in the widget; bookings honour a chosen staff or auto-assign the first free member. Availability + block checks are validated again at booking time, and the atomic insert now guards against overlapping bookings for the assigned staff (different staff can take parallel guests).
+- Dashboard staff page: weekly schedule editor per member (day + start/end rows) and a "Days off / blocked dates" card for the whole business or one staff member, with upcoming list and delete.
+- New owner actions: `saveStaffAvailability`, `addBlockedDate`, `deleteBlockedDate` (owner-scoped, validated, no interactive transactions).
+- Verified with a live-DB test matrix: Sarah 09-12 / Maria 14-18 — Sarah at 10:00 OK, Maria at 10:00 rejected, "Any" at 11:00 auto-assigned Sarah, Sarah at 15:00 rejected, "Any" at 15:00 auto-assigned Maria, inactive staff rejected, staff blocked-day rejected. Typecheck/lint/build clean.
+
 ### 2026-09-26 — Email provider selection + production smoke test
 - `EMAIL_PROVIDER=brevo` now makes Brevo the primary sender with Resend as fallback (default remains Resend-first). Set in Vercel to use the working Brevo account.
 - Smoke-tested https://bookeasyapp.vercel.app: homepage pricing section renders (₱999 / ₱1,999 / "Most popular"), `/api/keepalive` returns success with 1 row, `/glow-beauty-studio` renders live data, PayMongo webhook route reachable (400 on invalid payload).
