@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/supabase/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { planDefinition } from "@/lib/plans";
 
 const staffSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
@@ -33,6 +34,20 @@ export async function createStaffMember(formData: FormData) {
     role: formData.get("role"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { plan: true, plan_expires_at: true },
+  });
+  const limit = planDefinition(business ?? {}).staffLimit;
+  if (limit !== null) {
+    const staffCount = await prisma.staff.count({ where: { business_id: businessId } });
+    if (staffCount >= limit) {
+      throw new Error(
+        `Your ${planDefinition(business ?? {}).name} plan allows ${limit} staff member${limit === 1 ? "" : "s"}. Upgrade to add more.`
+      );
+    }
+  }
 
   await prisma.staff.create({
     data: {

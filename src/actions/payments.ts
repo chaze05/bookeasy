@@ -169,10 +169,13 @@ export async function ownerUpdatePaymentMethod(formData: FormData) {
 export async function submitSubscriptionPayment(formData: FormData) {
   const business = await getOwnedBusiness();
   const paymentMethodType = String(formData.get("payment_method_type") ?? "").trim();
+  const planRaw = String(formData.get("plan") ?? "pro");
+  const plan = planRaw === "business" ? "business" : planRaw === "pro" ? "pro" : null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const proof = formData.get("payment_proof");
 
   if (!paymentMethodType) throw new Error("Please select a payment method.");
+  if (!plan) throw new Error("Please choose a plan.");
   if (!(proof instanceof File) || proof.size === 0) {
     throw new Error("Please upload a payment proof image.");
   }
@@ -184,6 +187,7 @@ export async function submitSubscriptionPayment(formData: FormData) {
       business_id: business.id,
       payment_method_type: paymentMethodType,
       payment_proof_url: proofUrl,
+      plan,
       notes,
     },
   });

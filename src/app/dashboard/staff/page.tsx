@@ -3,6 +3,7 @@ import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import { StaffList } from "./staff-list";
+import { planDefinition } from "@/lib/plans";
 import type { Staff } from "@/types";
 
 export const metadata = { title: "Staff" };
@@ -18,8 +19,9 @@ export default async function StaffPage() {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true },
+    select: { id: true, plan: true, plan_expires_at: true },
   });
+  const staffLimit = planDefinition(business ?? {}).staffLimit;
 
   let staff: Staff[] = [];
   let availability: {
@@ -68,7 +70,12 @@ export default async function StaffPage() {
           Manage your team, their weekly hours and days off.
         </p>
       </div>
-      <StaffList staff={staff} availability={availability} blockedDates={blockedDates} />
+      <StaffList
+        staff={staff}
+        availability={availability}
+        blockedDates={blockedDates}
+        staffLimit={staffLimit}
+      />
     </div>
   );
 }

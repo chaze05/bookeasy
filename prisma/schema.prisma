@@ -37,6 +37,8 @@ model Business {
   paymongo_enabled        Boolean  @default(false)
   paymongo_secret_key_encrypted String?
   paymongo_webhook_secret_encrypted String?
+  plan                    String   @default("free")
+  plan_expires_at         DateTime? @db.Timestamptz(6)
   created_at              DateTime @default(now()) @db.Timestamptz(6)
   updated_at              DateTime @default(now()) @db.Timestamptz(6)
 
@@ -202,6 +204,7 @@ model SubscriptionPayment {
   business_id         String   @db.Uuid
   payment_method_type String
   payment_proof_url   String
+  plan                String   @default("pro")
   status              String   @default("pending")
   notes               String?
   created_at          DateTime @default(now()) @db.Timestamptz(6)

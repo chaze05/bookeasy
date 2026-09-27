@@ -15,9 +15,10 @@ interface PaymongoSettingsFormProps {
     hasSecretKey: boolean;
     hasWebhookSecret: boolean;
   };
+  canUseOnlinePayments?: boolean;
 }
 
-export function PaymongoSettingsForm({ status }: PaymongoSettingsFormProps) {
+export function PaymongoSettingsForm({ status, canUseOnlinePayments = false }: PaymongoSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
   const [enabled, setEnabled] = useState(status.enabled);
   const [secretKey, setSecretKey] = useState("");
@@ -65,8 +66,19 @@ export function PaymongoSettingsForm({ status }: PaymongoSettingsFormProps) {
             <CreditCard className="h-4 w-4 text-zinc-500" />
             <h2 className="text-sm font-semibold text-zinc-100">Online payments (PayMongo)</h2>
           </div>
-          <Switch checked={enabled} onCheckedChange={setEnabled} />
+          <Switch
+            checked={enabled && canUseOnlinePayments}
+            onCheckedChange={setEnabled}
+            disabled={!canUseOnlinePayments}
+          />
         </div>
+
+        {!canUseOnlinePayments && (
+          <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            Online payments are available on the Pro plan and above. Upgrade from the Subscription
+            tab to accept GCash, Maya, card and QR Ph payments automatically.
+          </p>
+        )}
 
         <p className="text-xs text-zinc-500">
           Lets customers pay instantly with GCash, Maya, GrabPay, card or QR Ph. Deposits are
@@ -138,7 +150,7 @@ export function PaymongoSettingsForm({ status }: PaymongoSettingsFormProps) {
       <div className="flex justify-end">
         <Button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !canUseOnlinePayments}
           className="bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-50"
         >
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save online payment settings"}

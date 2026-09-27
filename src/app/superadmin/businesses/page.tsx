@@ -123,6 +123,7 @@ export default async function SuperadminBusinessesPage() {
                       <BusinessActions
                         businessId={biz.id}
                         status={biz.status}
+                        plan={biz.plan}
                       />
                     </TableCell>
                   </TableRow>

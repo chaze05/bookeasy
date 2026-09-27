@@ -49,6 +49,8 @@ export interface Business {
   deposit_type: "none" | "percent" | "fixed";
   deposit_value: number;
   paymongo_enabled: boolean;
+  plan: "free" | "pro" | "business";
+  plan_expires_at: string | null;
   created_at: string;
   updated_at: string;
 }

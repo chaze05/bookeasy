@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { BarChart3, TrendingUp, Users, DollarSign, CalendarCheck, Percent } from "lucide-react";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { canUse } from "@/lib/plans";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { UpgradeCard } from "@/components/dashboard/upgrade-card";
 
 export const metadata = { title: "Analytics" };
 
@@ -20,7 +22,7 @@ export default async function AnalyticsPage() {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true },
+    select: { id: true, plan: true, plan_expires_at: true },
   });
 
   if (!business) {
@@ -28,6 +30,21 @@ export default async function AnalyticsPage() {
       <div className="flex flex-col items-center gap-3 py-24 text-center">
         <BarChart3 className="h-10 w-10 text-zinc-700" />
         <p className="text-sm text-zinc-500">Set up your business to see analytics.</p>
+      </div>
+    );
+  }
+
+  if (!canUse("reports", business)) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-100">Analytics</h1>
+          <p className="mt-1 text-sm text-zinc-500">Track revenue, bookings and trends.</p>
+        </div>
+        <UpgradeCard
+          title="Analytics is a Pro feature"
+          description="Upgrade to see revenue, booking trends, popular services and no-show rates for your business."
+        />
       </div>
     );
   }

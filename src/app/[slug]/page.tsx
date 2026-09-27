@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { canUse } from "@/lib/plans";
 import { BusinessHero } from "@/components/business/hero";
 import { ServicesSection } from "@/components/business/services";
 import { StaffSection } from "@/components/business/staff";
@@ -41,6 +42,8 @@ export default async function BookingPage({
       currency: true,
       deposit_type: true,
       deposit_value: true,
+      plan: true,
+      plan_expires_at: true,
       business_hours_start: true,
       business_hours_end: true,
       services: {
@@ -87,8 +90,8 @@ export default async function BookingPage({
           id: business.id,
           name: business.name,
           currency: business.currency,
-          deposit_type: business.deposit_type,
-          deposit_value: Number(business.deposit_value),
+          deposit_type: canUse("deposits", business) ? business.deposit_type : "none",
+          deposit_value: canUse("deposits", business) ? Number(business.deposit_value) : 0,
         }}
         services={services}
         paymentMethods={business.payment_methods.map((m) => ({

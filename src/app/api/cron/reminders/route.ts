@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { sendBookingReminderEmail } from "@/lib/email";
 import { buildManageUrl } from "@/lib/booking-tokens";
 import { getAppBaseUrl } from "@/lib/notify";
+import { canUse } from "@/lib/plans";
 import { formatZonedDate, formatZonedTime, safeTimeZone } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,15 @@ export async function GET(request: Request) {
       starts_at: { gte: windowStart, lte: windowEnd },
     },
     include: {
-      business: { select: { name: true, timezone: true, contact_email: true } },
+      business: {
+        select: {
+          name: true,
+          timezone: true,
+          contact_email: true,
+          plan: true,
+          plan_expires_at: true,
+        },
+      },
       service: { select: { name: true } },
     },
     take: 100,
@@ -36,8 +45,13 @@ export async function GET(request: Request) {
 
   let sent = 0;
   let failed = 0;
+  let skippedPlan = 0;
 
   for (const booking of bookings) {
+    if (!canUse("reminders", booking.business)) {
+      skippedPlan++;
+      continue;
+    }
     const timeZone = safeTimeZone(booking.business.timezone);
     let manageUrl: string | undefined;
     try {
@@ -75,5 +89,6 @@ export async function GET(request: Request) {
     candidates: bookings.length,
     sent,
     failed,
+    skippedPlan,
   });
 }

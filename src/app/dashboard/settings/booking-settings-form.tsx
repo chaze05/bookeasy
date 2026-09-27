@@ -13,9 +13,10 @@ import { Switch } from "@/components/ui/switch";
 
 interface BookingSettingsFormProps {
   business: Business | null;
+  canUseDeposits?: boolean;
 }
 
-export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
+export function BookingSettingsForm({ business, canUseDeposits = false }: BookingSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
   const [allowMultiple, setAllowMultiple] = useState(
     business?.allow_multiple_bookings ?? false
@@ -62,8 +63,8 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
       fd.append("business_hours_start", hoursStart);
       fd.append("business_hours_end", hoursEnd);
       fd.append("realtime_enabled", String(realtimeEnabled));
-      fd.append("deposit_type", depositType);
-      fd.append("deposit_value", String(depositValue));
+      fd.append("deposit_type", canUseDeposits ? depositType : "none");
+      fd.append("deposit_value", String(canUseDeposits ? depositValue : 0));
       try {
         await updateBookingSettings(business!.id, fd);
         toast.success("Booking settings saved");
@@ -178,9 +179,16 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
 
         <div className="flex flex-col gap-4">
           <p className="text-xs text-zinc-500">
-            Ask customers to pay a deposit up front to reserve their slot. The
-            remaining balance is collected at the appointment.
+            Ask customers to pay a deposit up front to reserve their slot. The remaining balance is
+            collected at the appointment.
           </p>
+
+          {!canUseDeposits && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              Deposits are available on the Pro plan and above. Upgrade from the Subscription tab to
+              enable them.
+            </p>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label className="text-zinc-300">Deposit type</Label>
@@ -189,7 +197,8 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
               onChange={(e) =>
                 setDepositType(e.target.value as "none" | "percent" | "fixed")
               }
-              className="h-8 w-56 rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+              disabled={!canUseDeposits}
+              className="h-8 w-56 rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="none" className="bg-zinc-800">
                 No deposit (full payment)
@@ -221,6 +230,7 @@ export function BookingSettingsForm({ business }: BookingSettingsFormProps) {
                   step={depositType === "percent" ? 1 : 0.01}
                   value={depositValue}
                   onChange={(e) => setDepositValue(Number(e.target.value))}
+                  disabled={!canUseDeposits}
                   className={`w-32 ${inputClass}`}
                 />
                 {depositType === "percent" && (

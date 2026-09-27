@@ -555,6 +555,7 @@ function StaffCard({ member, availability }: StaffCardProps) {
 
 interface StaffListProps {
   staff: Staff[];
+  staffLimit?: number | null;
   availability: {
     id: string;
     staff_id: string;
@@ -570,13 +571,24 @@ interface StaffListProps {
   }[];
 }
 
-export function StaffList({ staff, availability, blockedDates }: StaffListProps) {
+export function StaffList({ staff, availability, blockedDates, staffLimit = null }: StaffListProps) {
   const [addOpen, setAddOpen] = useState(false);
+  const atLimit = staffLimit !== null && staff.length >= staffLimit;
 
   return (
     <>
-      <div className="flex justify-end">
-        <Button onClick={() => setAddOpen(true)} className="gap-2 bg-emerald-500 text-white hover:bg-emerald-400">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {atLimit && (
+          <p className="mr-auto rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+            Your plan includes {staffLimit} staff member{staffLimit === 1 ? "" : "s"}. Upgrade in
+            Settings → Subscription to add more.
+          </p>
+        )}
+        <Button
+          onClick={() => setAddOpen(true)}
+          disabled={atLimit}
+          className="gap-2 bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-40"
+        >
           <Plus className="h-4 w-4" />
           Add member
         </Button>

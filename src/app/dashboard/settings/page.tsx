@@ -8,6 +8,7 @@ import { BookingSettingsForm } from "./booking-settings-form";
 import { PaymentMethodsForm } from "./payment-methods-form";
 import { PaymongoSettingsForm } from "./paymongo-settings-form";
 import { SubscriptionForm } from "./subscription-form";
+import { planDefinition, canUse } from "@/lib/plans";
 import type { Profile, Business } from "@/types";
 
 export const metadata = { title: "Settings" };
@@ -67,6 +68,7 @@ export default async function SettingsPage() {
     id: string;
     payment_method_type: string;
     payment_proof_url: string;
+    plan: string;
     status: string;
     notes: string | null;
     created_at: string;
@@ -85,6 +87,19 @@ export default async function SettingsPage() {
     }
   }
   const subscriptionMethods = [...subscriptionMethodMap.values()];
+
+  const planInfo = rawBusiness
+    ? planDefinition(rawBusiness)
+    : planDefinition({});
+  const currentPlan = {
+    name: planInfo.name,
+    price: planInfo.price,
+    expiresAt: rawBusiness?.plan_expires_at
+      ? rawBusiness.plan_expires_at.toISOString()
+      : null,
+  };
+  const canUseDeposits = rawBusiness ? canUse("deposits", rawBusiness) : false;
+  const canUseOnlinePayments = rawBusiness ? canUse("onlinePayments", rawBusiness) : false;
 
   return (
     <div className="flex max-w-4xl flex-col gap-6">
@@ -108,16 +123,20 @@ export default async function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="booking">
-          <BookingSettingsForm business={business} />
+          <BookingSettingsForm business={business} canUseDeposits={canUseDeposits} />
         </TabsContent>
 
         <TabsContent value="payments" className="flex flex-col gap-6">
-          <PaymongoSettingsForm status={paymongoStatus} />
+          <PaymongoSettingsForm status={paymongoStatus} canUseOnlinePayments={canUseOnlinePayments} />
           <PaymentMethodsForm methods={paymentMethods} />
         </TabsContent>
 
         <TabsContent value="subscription">
-          <SubscriptionForm payments={subscriptionPayments} methods={subscriptionMethods} />
+          <SubscriptionForm
+            payments={subscriptionPayments}
+            methods={subscriptionMethods}
+            currentPlan={currentPlan}
+          />
         </TabsContent>
       </Tabs>
     </div>

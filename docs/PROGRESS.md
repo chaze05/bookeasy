@@ -10,6 +10,18 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-27 — Subscription plan enforcement (branch `feat/staff-booking-readiness`)
+- `migration_014.sql` (applied live): `businesses.plan` (`free/pro/business`), `businesses.plan_expires_at`, `subscription_payments.plan`; demo businesses set to `business`.
+- `src/lib/plans.ts` — single source of truth for limits/features: Starter (1 staff, 50 bookings/mo, no online payments/deposits/reminders/reports), Pro (5 staff, everything), Business (unlimited). Expired paid plans fall back to free automatically.
+- Enforcement wired into every entry point:
+  - Staff: `createStaffMember` blocks over the limit; staff page shows an upgrade banner and disables Add.
+  - Bookings: monthly booking cap, online-payment and deposit feature gates in `createPublicBooking`; public page hides deposits on plans without them.
+  - Settings: deposit saving and PayMongo enabling are rejected server-side and greyed out client-side with upgrade notes.
+  - Reminders cron skips businesses whose plan lacks reminders (`skippedPlan` in the response).
+  - Analytics and Reports render an upgrade card instead of data.
+- Upgrade loop: owners pick Pro/Business when uploading a subscription payment (`subscription_payments.plan`); approving it in superadmin activates that plan for 30 days and extends existing time. Superadmin businesses table also has a manual plan selector.
+- Verified with live tests: 52 current-month bookings on free → next booking rejected; under limit → 200; cron on free sent 0 and skipped 1, reminder not marked. Typecheck/lint/build clean; screenshots captured for plan UI, deposit gating, analytics upgrade card and staff limit.
+
 ### 2026-09-27 — Appointment reminders + legal pages (branch `feat/staff-booking-readiness`)
 - `migration_013.sql` (applied live): `bookings.reminder_sent_at` + partial index; Prisma regenerated.
 - New `BookingReminderEmail` template and `sendBookingReminderEmail` (returns delivery result, Brevo/Resend via `deliverEmail`).

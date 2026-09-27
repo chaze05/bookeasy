@@ -13,6 +13,7 @@ import { getAppBaseUrl, getBusinessNotificationEmail } from "@/lib/notify";
 import { buildBookingActionUrl, buildManageUrl } from "@/lib/booking-tokens";
 import { createPaymongoCheckout } from "@/lib/paymongo";
 import { decryptSecret } from "@/lib/crypto";
+import { effectivePlan, PLANS } from "@/lib/plans";
 import {
   formatZonedDate,
   formatZonedTime,
@@ -264,6 +265,8 @@ export async function createPublicBooking(
         deposit_value: true,
         paymongo_enabled: true,
         paymongo_secret_key_encrypted: true,
+        plan: true,
+        plan_expires_at: true,
       },
     }),
     prisma.service.findUnique({
@@ -293,6 +296,29 @@ export async function createPublicBooking(
   }
   if (isOnlinePayment && (!business.paymongo_enabled || !business.paymongo_secret_key_encrypted)) {
     throw new Error("Online payment is not available right now. Please choose another payment method.");
+  }
+  if (isOnlinePayment && !PLANS[effectivePlan(business)].onlinePayments) {
+    throw new Error("Online payment is not available right now. Please choose another payment method.");
+  }
+
+  // Plan limit: bookings per calendar month.
+  const monthlyBookingLimit = PLANS[effectivePlan(business)].monthlyBookings;
+  if (monthlyBookingLimit !== null) {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const monthlyCount = await prisma.booking.count({
+      where: {
+        business_id: businessId,
+        created_at: { gte: monthStart },
+        status: { not: "cancelled" },
+      },
+    });
+    if (monthlyCount >= monthlyBookingLimit) {
+      throw new Error(
+        "This business is not accepting new bookings right now. Please contact them directly."
+      );
+    }
   }
 
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -368,6 +394,8 @@ export async function createPublicBooking(
     depositAmount = rawDeposit;
   }
   depositAmount = Math.min(Math.max(depositAmount, 0), amountTotal);
+  // Deposits require a plan that includes them; silently fall back otherwise.
+  if (!PLANS[effectivePlan(business)].deposits) depositAmount = 0;
 
   const bookingId = crypto.randomUUID();
   let paymentProofUrl: string | null = null;

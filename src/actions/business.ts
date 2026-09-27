@@ -5,6 +5,7 @@ import { createClient } from "@/supabase/server";
 import { businessSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/crypto";
+import { effectivePlan, PLANS } from "@/lib/plans";
 import { z } from "zod";
 
 const bookingSettingsSchema = z
@@ -112,9 +113,13 @@ export async function updatePaymongoSettings(formData: FormData) {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true, paymongo_secret_key_encrypted: true },
+    select: { id: true, paymongo_secret_key_encrypted: true, plan: true, plan_expires_at: true },
   });
   if (!business) throw new Error("No business found");
+
+  if (parsed.data.paymongo_enabled && !PLANS[effectivePlan(business)].onlinePayments) {
+    throw new Error("Online payments are available on the Pro plan and above. Upgrade to enable them.");
+  }
 
   const secretKey = parsed.data.paymongo_secret_key?.trim();
   const webhookSecret = parsed.data.paymongo_webhook_secret?.trim();
@@ -178,6 +183,15 @@ export async function updateBookingSettings(id: string, formData: FormData) {
     deposit_value: formData.get("deposit_value"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const planRecord = await prisma.business.findFirst({
+    where: { id, owner_id: user.id },
+    select: { plan: true, plan_expires_at: true },
+  });
+  if (!planRecord) throw new Error("Business not found");
+  if (parsed.data.deposit_type !== "none" && !PLANS[effectivePlan(planRecord)].deposits) {
+    throw new Error("Deposits are available on the Pro plan and above. Upgrade to enable deposits.");
+  }
 
   const result = await prisma.business.updateMany({
     where: { id, owner_id: user.id },

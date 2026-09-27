@@ -3,6 +3,8 @@ import { format } from "date-fns";
 import { FileBarChart, DollarSign, CalendarCheck, ReceiptText } from "lucide-react";
 import { createClient } from "@/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { canUse } from "@/lib/plans";
+import { UpgradeCard } from "@/components/dashboard/upgrade-card";
 
 export const metadata = { title: "Reports" };
 
@@ -13,8 +15,23 @@ export default async function ReportsPage() {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true },
+    select: { id: true, plan: true, plan_expires_at: true },
   });
+
+  if (business && !canUse("reports", business)) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-100">Reports</h1>
+          <p className="mt-1 text-sm text-zinc-500">Payment and booking summaries.</p>
+        </div>
+        <UpgradeCard
+          title="Reports is a Pro feature"
+          description="Upgrade to export revenue summaries, completed bookings and payment proof totals."
+        />
+      </div>
+    );
+  }
 
   const bookings = business
     ? await prisma.booking.findMany({
