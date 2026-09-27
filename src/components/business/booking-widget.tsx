@@ -69,6 +69,7 @@ const PAYMENT_ICONS: Record<string, React.ElementType> = {
   wise: Globe,
   bank_transfer: Landmark,
   cash: Banknote,
+  paymongo: CreditCard,
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -78,6 +79,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   wise: "#9FE870",
   bank_transfer: "#F59E0B",
   cash: "#22C55E",
+  paymongo: "#2563EB",
 };
 
 function fmtTime(t: string) {
@@ -171,7 +173,11 @@ export function BookingWidget({
       if (activePaymentMethod) fd.append("paymentMethodId", activePaymentMethod.id);
       if (proof) fd.append("paymentProof", proof);
       try {
-        await createPublicBooking(fd);
+        const result = await createPublicBooking(fd);
+        if (result.checkoutUrl) {
+          window.location.href = result.checkoutUrl;
+          return;
+        }
         setStep(3);
       } catch (e) {
         alert(e instanceof Error ? e.message : "Something went wrong");
@@ -200,7 +206,10 @@ export function BookingWidget({
   const isFinalSuccess = step === 3 || step === 4;
 
   const activePaymentMethod = paymentMethods.find((m) => m.type === selectedPaymentType);
-  const activePaymentRequiresProof = Boolean(activePaymentMethod && activePaymentMethod.type !== "cash");
+  const activePaymentRequiresProof = Boolean(
+    activePaymentMethod && activePaymentMethod.type !== "cash" && activePaymentMethod.type !== "paymongo"
+  );
+  const isOnlineCheckout = activePaymentMethod?.type === "paymongo";
 
   const totalAmount = service.price;
   const rawDeposit = Number(business.deposit_value ?? 0);
@@ -601,7 +610,15 @@ export function BookingWidget({
                     disabled={isPending || (activePaymentRequiresProof && !paymentProof)}
                     className="w-full bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-30"
                   >
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : activePaymentRequiresProof ? "Submit payment proof" : "Confirm booking"}
+                    {isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isOnlineCheckout ? (
+                      `Pay ${formatMoney(showDeposit ? depositAmount : totalAmount, business.currency)} & confirm`
+                    ) : activePaymentRequiresProof ? (
+                      "Submit payment proof"
+                    ) : (
+                      "Confirm booking"
+                    )}
                   </Button>
                   <button
                     onClick={reset}

@@ -48,6 +48,7 @@ export interface Business {
   status: BusinessStatus;
   deposit_type: "none" | "percent" | "fixed";
   deposit_value: number;
+  paymongo_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -120,6 +121,7 @@ export interface Booking {
   payment_proof_url: string | null;
   amount_total: number | null;
   deposit_amount: number | null;
+  payment_status: "unpaid" | "deposit_paid" | "paid" | "refunded";
   starts_at: string;
   ends_at: string;
   status: BookingStatus;

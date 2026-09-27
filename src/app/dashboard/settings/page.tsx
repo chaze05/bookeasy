@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileForm } from "./profile-form";
 import { BookingSettingsForm } from "./booking-settings-form";
 import { PaymentMethodsForm } from "./payment-methods-form";
+import { PaymongoSettingsForm } from "./paymongo-settings-form";
 import { SubscriptionForm } from "./subscription-form";
 import type { Profile, Business } from "@/types";
 
@@ -22,7 +23,20 @@ export default async function SettingsPage() {
   ]);
 
   const profile = rawProfile ? (serialize(rawProfile) as unknown as Profile) : null;
-  const business = rawBusiness ? (serialize(rawBusiness) as unknown as Business) : null;
+  let business: Business | null = null;
+  if (rawBusiness) {
+    const safeBusiness = { ...rawBusiness } as Record<string, unknown>;
+    delete safeBusiness.paymongo_secret_key_encrypted;
+    delete safeBusiness.paymongo_webhook_secret_encrypted;
+    business = serialize(safeBusiness) as unknown as Business;
+  }
+  const paymongoStatus = rawBusiness
+    ? {
+        enabled: rawBusiness.paymongo_enabled,
+        hasSecretKey: Boolean(rawBusiness.paymongo_secret_key_encrypted),
+        hasWebhookSecret: Boolean(rawBusiness.paymongo_webhook_secret_encrypted),
+      }
+    : { enabled: false, hasSecretKey: false, hasWebhookSecret: false };
   const [rawPaymentMethods, rawSubscriptionPayments, rawSubscriptionMethods] = business
     ? await Promise.all([
         prisma.paymentMethod.findMany({
@@ -35,7 +49,7 @@ export default async function SettingsPage() {
           take: 10,
         }),
         prisma.paymentMethod.findMany({
-          where: { is_enabled: true, type: { not: "cash" } },
+          where: { business_id: business.id, is_enabled: true, type: { not: "cash" } },
           orderBy: [{ type: "asc" }, { sort_order: "asc" }],
         }),
       ])
@@ -97,7 +111,8 @@ export default async function SettingsPage() {
           <BookingSettingsForm business={business} />
         </TabsContent>
 
-        <TabsContent value="payments">
+        <TabsContent value="payments" className="flex flex-col gap-6">
+          <PaymongoSettingsForm status={paymongoStatus} />
           <PaymentMethodsForm methods={paymentMethods} />
         </TabsContent>
 

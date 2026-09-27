@@ -6,8 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/serialize";
 import { uploadPaymentProof } from "@/lib/storage";
 
-export type PaymentType = "stripe" | "gcash" | "maya" | "wise" | "bank_transfer" | "cash";
-const PAYMENT_TYPES: PaymentType[] = ["stripe", "gcash", "maya", "wise", "bank_transfer", "cash"];
+export type PaymentType = "stripe" | "gcash" | "maya" | "wise" | "bank_transfer" | "cash" | "paymongo";
+const PAYMENT_TYPES: PaymentType[] = ["stripe", "gcash", "maya", "wise", "bank_transfer", "cash", "paymongo"];
 
 export interface PaymentMethodConfig {
   id?: string;
@@ -256,6 +256,9 @@ export async function adminUpdatePaymentMethod(formData: FormData) {
 function getPaymentDetailKeys(type: string) {
   if (type === "cash") {
     return ["instructions"];
+  }
+  if (type === "paymongo") {
+    return [];
   }
   if (type === "gcash" || type === "maya") {
     return ["account_name", "number", "qr_image_url", "app_link", "payment_link"];

@@ -11,6 +11,8 @@ import {
 } from "@/lib/email";
 import { getAppBaseUrl, getBusinessNotificationEmail } from "@/lib/notify";
 import { buildBookingActionUrl, buildManageUrl } from "@/lib/booking-tokens";
+import { createPaymongoCheckout } from "@/lib/paymongo";
+import { decryptSecret } from "@/lib/crypto";
 import {
   formatZonedDate,
   formatZonedTime,
@@ -96,7 +98,9 @@ export async function getAvailableSlots(
   return slots;
 }
 
-export async function createPublicBooking(formData: FormData): Promise<void> {
+export async function createPublicBooking(
+  formData: FormData
+): Promise<{ bookingId: string; checkoutUrl?: string }> {
   const businessId = formData.get("businessId") as string;
   const serviceId = formData.get("serviceId") as string;
   const dateStr = formData.get("date") as string;
@@ -132,6 +136,8 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
         booking_interval: true,
         deposit_type: true,
         deposit_value: true,
+        paymongo_enabled: true,
+        paymongo_secret_key_encrypted: true,
       },
     }),
     prisma.service.findUnique({
@@ -147,7 +153,10 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   if (!service) throw new Error("Service not found.");
 
   const selectedPaymentMethod = enabledPaymentMethods.find((method) => method.id === paymentMethodId);
-  const requiresPaymentProof = Boolean(selectedPaymentMethod && selectedPaymentMethod.type !== "cash");
+  const isOnlinePayment = selectedPaymentMethod?.type === "paymongo";
+  const requiresPaymentProof = Boolean(
+    selectedPaymentMethod && selectedPaymentMethod.type !== "cash" && !isOnlinePayment
+  );
   const validPaymentMethodIds = new Set(enabledPaymentMethods.map((method) => method.id));
 
   if (enabledPaymentMethods.length > 0 && (!paymentMethodId || !validPaymentMethodIds.has(paymentMethodId))) {
@@ -155,6 +164,9 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   }
   if (requiresPaymentProof && !(paymentProof instanceof File)) {
     throw new Error("Please upload a payment proof image.");
+  }
+  if (isOnlinePayment && (!business.paymongo_enabled || !business.paymongo_secret_key_encrypted)) {
+    throw new Error("Online payment is not available right now. Please choose another payment method.");
   }
 
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -276,6 +288,48 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
     console.error("Failed to build booking links:", error);
   }
 
+  // Online payment (PayMongo): create a hosted checkout session and record it.
+  let checkoutUrl: string | undefined;
+  if (isOnlinePayment) {
+    if (!baseUrl || !manageUrl || !business.paymongo_secret_key_encrypted) {
+      throw new Error("Online payment is not available right now. Please choose another payment method.");
+    }
+    try {
+      const chargeAmount = depositAmount > 0 ? depositAmount : amountTotal;
+      const session = await createPaymongoCheckout({
+        secretKey: decryptSecret(business.paymongo_secret_key_encrypted),
+        amount: Math.round(chargeAmount * 100),
+        description: `${service.name} — ${business.name}`,
+        referenceNumber: bookingId,
+        successUrl: `${manageUrl}&payment=success`,
+        cancelUrl: `${manageUrl}&payment=cancel`,
+        metadata: { booking_id: bookingId, business_id: businessId },
+      });
+      checkoutUrl = session.checkoutUrl;
+
+      await prisma.payment.create({
+        data: {
+          booking_id: bookingId,
+          business_id: businessId,
+          provider: "paymongo",
+          provider_ref: session.id,
+          checkout_url: session.checkoutUrl,
+          amount: chargeAmount,
+          currency: "PHP",
+          status: "pending",
+        },
+      });
+    } catch (error) {
+      // Don't leave a pending booking behind if checkout could not be created.
+      await prisma.booking.delete({ where: { id: bookingId } }).catch(() => {});
+      console.error("[createPublicBooking] PayMongo checkout failed:", {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
   const emailJobs: Promise<unknown>[] = [
     sendBookingReceivedEmail({
       to: customerEmail,
@@ -317,6 +371,8 @@ export async function createPublicBooking(formData: FormData): Promise<void> {
   }
 
   await Promise.allSettled(emailJobs);
+
+  return { bookingId, checkoutUrl };
 }
 
 export async function updateBookingStatus(id: string, status: BookingStatus) {

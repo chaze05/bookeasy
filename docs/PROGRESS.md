@@ -10,6 +10,15 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — PayMongo online payments (per-business accounts)
+- `migration_012.sql` applied live: `businesses.paymongo_enabled`, `paymongo_secret_key_encrypted`, `paymongo_webhook_secret_encrypted`; `bookings.payment_status` (`unpaid/deposit_paid/paid/refunded`); new `payments` table (RLS on, server-only); `payment_methods` type check now allows `paymongo`.
+- `src/lib/crypto.ts` — AES-256-GCM at-rest encryption for stored secret keys (key from `PAYMENTS_ENCRYPTION_KEY`, fallback derived from the service-role key).
+- `src/lib/paymongo.ts` — REST client (no npm package): `createPaymongoCheckout()` (hosted Checkout Session, centavos, PHP) and `verifyPaymongoSignature()` (HMAC-SHA256 of `t.rawBody`, timing-safe, test + live signatures).
+- Booking flow: `createPublicBooking` now returns `{ bookingId, checkoutUrl }`. When the selected method is `paymongo`, it charges the deposit (or full amount), creates a checkout session, stores a `payments` row, and the widget redirects the customer to PayMongo. If checkout creation fails, the pending booking is deleted so no orphan remains.
+- Webhook: `POST /api/payments/paymongo/webhook` verifies the signature with the business's secret, marks the payment `paid`, sets `payment_status` to `deposit_paid`/`paid`, auto-confirms the booking, and emails the customer. Idempotent on retries.
+- Dashboard settings → Payments: new PayMongo card (enable toggle, secret key + webhook signing secret inputs with "saved" indicators, copyable webhook URL). Enabling syncs a public "Pay online (GCash, Maya, card)" method. Encrypted key columns are stripped from the client payload; subscription method query scoped to the owner's business.
+- Verified: crypto roundtrip + tamper rejection, signature accept/reject (tampered body, wrong secret, missing header, live signature) all pass; build registers `/api/payments/paymongo/webhook`; unconfigured and fake-key checkout attempts both return clean errors with no orphan bookings; demo business reset to disabled afterwards.
+
 ### 2026-09-26 — Pricing tweak
 - Raised the Pro plan from ₱799 to ₱999 (`migration_011.sql`, applied live) and updated the fallback default in `src/lib/homepage-content.ts`.
 

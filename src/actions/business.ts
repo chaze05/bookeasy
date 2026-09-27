@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/supabase/server";
 import { businessSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
+import { encryptSecret } from "@/lib/crypto";
 import { z } from "zod";
 
 const bookingSettingsSchema = z
@@ -87,6 +88,78 @@ export async function createBusiness(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+}
+
+const paymongoSettingsSchema = z.object({
+  paymongo_enabled: z.string().transform((v) => v === "true"),
+  paymongo_secret_key: z.string().optional(),
+  paymongo_webhook_secret: z.string().optional(),
+});
+
+export async function updatePaymongoSettings(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const parsed = paymongoSettingsSchema.safeParse({
+    paymongo_enabled: formData.get("paymongo_enabled"),
+    paymongo_secret_key: formData.get("paymongo_secret_key") ?? undefined,
+    paymongo_webhook_secret: formData.get("paymongo_webhook_secret") ?? undefined,
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const business = await prisma.business.findFirst({
+    where: { owner_id: user.id },
+    select: { id: true, paymongo_secret_key_encrypted: true },
+  });
+  if (!business) throw new Error("No business found");
+
+  const secretKey = parsed.data.paymongo_secret_key?.trim();
+  const webhookSecret = parsed.data.paymongo_webhook_secret?.trim();
+
+  if (parsed.data.paymongo_enabled && !secretKey && !business.paymongo_secret_key_encrypted) {
+    throw new Error("Paste your PayMongo secret key before enabling online payments");
+  }
+
+  await prisma.business.update({
+    where: { id: business.id },
+    data: {
+      paymongo_enabled: parsed.data.paymongo_enabled,
+      ...(secretKey ? { paymongo_secret_key_encrypted: encryptSecret(secretKey) } : {}),
+      ...(webhookSecret
+        ? { paymongo_webhook_secret_encrypted: encryptSecret(webhookSecret) }
+        : {}),
+      updated_at: new Date(),
+    },
+  });
+
+  // Keep the public "Pay online" payment method in sync with the toggle.
+  const methodLabel = "Pay online (GCash, Maya, card)";
+  const existing = await prisma.paymentMethod.findFirst({
+    where: { business_id: business.id, type: "paymongo" },
+    select: { id: true },
+  });
+  if (existing) {
+    await prisma.paymentMethod.update({
+      where: { id: existing.id },
+      data: { is_enabled: parsed.data.paymongo_enabled, label: methodLabel, updated_at: new Date() },
+    });
+  } else {
+    await prisma.paymentMethod.create({
+      data: {
+        business_id: business.id,
+        type: "paymongo",
+        label: methodLabel,
+        is_enabled: parsed.data.paymongo_enabled,
+        sort_order: -1,
+        details: {},
+      },
+    });
+  }
+
+  revalidatePath("/dashboard/settings");
 }
 
 export async function updateBookingSettings(id: string, formData: FormData) {
