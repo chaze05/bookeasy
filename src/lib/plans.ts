@@ -34,7 +34,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   pro: {
     id: "pro",
     name: "Pro",
-    price: 999,
+    price: 1299,
     staffLimit: 5,
     monthlyBookings: null,
     onlinePayments: true,

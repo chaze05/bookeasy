@@ -91,7 +91,7 @@ export function SubscriptionForm({
               defaultValue="pro"
               className="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
             >
-              <option value="pro">Pro — ₱999/month</option>
+              <option value="pro">Pro — ₱1,299/month</option>
               <option value="business">Business — ₱1,999/month</option>
             </select>
           </div>

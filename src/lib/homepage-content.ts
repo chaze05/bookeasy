@@ -227,7 +227,7 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
         },
         {
           name: "Pro",
-          price: "₱999",
+          price: "₱1,299",
           period: "/month",
           description: "For growing teams that want to fill their calendar on autopilot.",
           features:
