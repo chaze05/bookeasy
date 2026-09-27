@@ -10,6 +10,9 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-26 — Pricing tweak
+- Raised the Pro plan from ₱799 to ₱999 (`migration_011.sql`, applied live) and updated the fallback default in `src/lib/homepage-content.ts`.
+
 ### 2026-09-26 — Customer self-service manage/reschedule page
 - `src/lib/booking-tokens.ts`: added signed `manage` tokens (30-day expiry, HMAC, timing-safe) + `buildManageUrl`.
 - New page `/booking/manage?token=…` (`src/app/booking/manage/`): no-index, dark-themed, shows booking summary (service, date/time in business timezone, status, deposit/balance) and a client panel to pick a new date/slot and reschedule or cancel. Invalid/expired tokens and non-manageable statuses render friendly messages; "Book again" links back to the business page.
