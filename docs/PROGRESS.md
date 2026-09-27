@@ -10,6 +10,14 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-27 — Appointment reminders + legal pages (branch `feat/staff-booking-readiness`)
+- `migration_013.sql` (applied live): `bookings.reminder_sent_at` + partial index; Prisma regenerated.
+- New `BookingReminderEmail` template and `sendBookingReminderEmail` (returns delivery result, Brevo/Resend via `deliverEmail`).
+- New cron endpoint `GET /api/cron/reminders`: sends reminders for bookings starting in 12–36 hours, marks `reminder_sent_at` only after a successful send, `CRON_SECRET` protected; wired into `vercel.json` (`0 1 * * *`, 09:00 Manila daily).
+- Verified: two test bookings (24h and 72h out) → cron sent exactly 1, only the 24h booking was marked, and the reminder email appears in Brevo's log with a working reschedule link.
+- Legal pages: `/privacy` (PH Data Privacy Act / RA 10173 aligned) and `/terms`, design-matched and linked from the homepage footer (fallback defaults + live DB footer row updated).
+- Screenshots captured with Playwright (homepage, pricing, booking dialog with staff picker, staff schedules, schedule editor, privacy) and shown for review.
+
 ### 2026-09-27 — Staff booking, weekly schedules, days off (branch `feat/staff-booking-readiness`)
 - Staff-aware availability engine (`src/actions/bookings.ts`): `getAvailableSlots(..., staffId?)` now respects weekly availability windows, business-wide and per-staff blocked dates, existing staff bookings (interval overlap), inactive staff, and timezone-local slots. Falls back to business-hours/capacity when no staff are configured.
 - Customer booking flow: new optional staff picker ("Any available" + team list) in the widget; bookings honour a chosen staff or auto-assign the first free member. Availability + block checks are validated again at booking time, and the atomic insert now guards against overlapping bookings for the assigned staff (different staff can take parallel guests).

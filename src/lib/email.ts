@@ -3,6 +3,7 @@ import { render } from "@react-email/components";
 import type { ReactElement } from "react";
 import { BookingReceivedEmail } from "@/components/emails/BookingReceivedEmail";
 import { BookingApprovedEmail } from "@/components/emails/BookingApprovedEmail";
+import { BookingReminderEmail } from "@/components/emails/BookingReminderEmail";
 import { OwnerBookingNotificationEmail } from "@/components/emails/OwnerBookingNotificationEmail";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -208,6 +209,41 @@ export async function sendBookingApprovedEmail({
     to,
     subject: `Booking Confirmed: ${safeHeaderValue(serviceName)} with ${safeHeaderValue(businessName)}`,
     reactElement: BookingApprovedEmail({
+      customerName,
+      businessName,
+      serviceName,
+      date,
+      time,
+      manageUrl,
+    }) as ReactElement,
+  });
+}
+
+export async function sendBookingReminderEmail({
+  to,
+  businessEmail,
+  customerName,
+  businessName,
+  serviceName,
+  date,
+  time,
+  manageUrl,
+}: {
+  to: string;
+  businessEmail?: string;
+  customerName: string;
+  businessName: string;
+  serviceName: string;
+  date: string;
+  time: string;
+  manageUrl?: string;
+}): Promise<boolean> {
+  return deliverEmail({
+    from: `${safeHeaderValue(businessName)} <${FROM_EMAIL}>`,
+    replyTo: businessEmail || undefined,
+    to,
+    subject: `Reminder: ${safeHeaderValue(serviceName)} on ${safeHeaderValue(date)} at ${safeHeaderValue(time)}`,
+    reactElement: BookingReminderEmail({
       customerName,
       businessName,
       serviceName,

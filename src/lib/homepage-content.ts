@@ -85,8 +85,8 @@ export const DEFAULT_FOOTER_CONTENT: FooterContent = {
     {
       heading: "Legal",
       links: [
-        { label: "Privacy", href: "#" },
-        { label: "Terms", href: "#" },
+        { label: "Privacy", href: "/privacy" },
+        { label: "Terms", href: "/terms" },
         { label: "Security", href: "#" },
       ],
     },

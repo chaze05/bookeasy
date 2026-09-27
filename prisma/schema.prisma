@@ -150,6 +150,7 @@ model Booking {
   amount_total   Decimal? @db.Decimal(10, 2)
   deposit_amount Decimal? @db.Decimal(10, 2)
   payment_status String   @default("unpaid")
+  reminder_sent_at DateTime? @db.Timestamptz(6)
   starts_at      DateTime @db.Timestamptz(6)
   ends_at        DateTime @db.Timestamptz(6)
   status         String   @default("pending")
