@@ -302,7 +302,9 @@ export function BookingWidget({
                 transition={{ duration: 0.16 }}
                 className="flex flex-col gap-5"
               >
-                {staff.length > 0 && (
+                {/* Only offer a choice when there is actually a choice — solo
+                    businesses get auto-assignment without extra UI. */}
+                {staff.length > 1 && (
                   <div className="flex flex-col gap-2">
                     <Label className="flex items-center gap-2 text-xs font-medium text-zinc-400">
                       <User className="h-3.5 w-3.5 text-emerald-500" />

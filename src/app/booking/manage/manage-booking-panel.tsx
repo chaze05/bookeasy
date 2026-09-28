@@ -13,6 +13,7 @@ interface ManageBookingPanelProps {
   token: string;
   timeZone: string;
   initialDate: string;
+  initialSlots?: string[];
   todayKey: string;
   businessHours: string;
 }
@@ -26,12 +27,13 @@ export function ManageBookingPanel({
   token,
   timeZone,
   initialDate,
+  initialSlots = [],
   todayKey,
   businessHours,
 }: ManageBookingPanelProps) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate);
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<string[]>(initialSlots);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isPending, startTransition] = useTransition();

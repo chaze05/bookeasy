@@ -44,7 +44,8 @@ async function loadStaffSchedule(
   businessId: string,
   dateKey: string,
   timeZone: string,
-  staffFilter?: string | null
+  staffFilter?: string | null,
+  excludeBookingId?: string | null
 ): Promise<StaffSchedule> {
   const [year, month, day] = dateKey.split("-").map(Number);
   const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
@@ -74,6 +75,7 @@ async function loadStaffSchedule(
         business_id: businessId,
         starts_at: { gte: dayRange.start, lt: dayRange.end },
         status: { not: "cancelled" },
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
       select: { staff_id: true, starts_at: true, ends_at: true },
     }),
@@ -131,7 +133,8 @@ export async function getAvailableSlots(
   businessId: string,
   serviceId: string,
   dateStr: string,
-  staffId?: string | null
+  staffId?: string | null,
+  excludeBookingId?: string | null
 ): Promise<string[]> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return [];
 
@@ -172,7 +175,7 @@ export async function getAvailableSlots(
   const isToday = dateStr === todayKey;
   const nowMinutes = isToday ? getZonedMinutes(new Date(), timeZone) : -1;
 
-  const schedule = await loadStaffSchedule(businessId, dateStr, timeZone, staffId);
+  const schedule = await loadStaffSchedule(businessId, dateStr, timeZone, staffId, excludeBookingId);
   if (schedule.businessBlocked) return [];
 
   // No staff (or none matching): fall back to business capacity per slot.
@@ -184,6 +187,7 @@ export async function getAvailableSlots(
         business_id: businessId,
         starts_at: { gte: dayRange.start, lt: dayRange.end },
         status: { not: "cancelled" },
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
       select: { starts_at: true },
     });

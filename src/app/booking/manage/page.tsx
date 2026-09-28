@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarCheck, CheckCircle2, Clock, MapPin } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyManageToken } from "@/lib/booking-tokens";
+import { getAvailableSlots } from "@/actions/bookings";
 import {
   formatZonedDate,
   formatZonedTime,
@@ -98,6 +99,23 @@ export default async function ManageBookingPage({
   const deposit = Number(booking.deposit_amount ?? 0);
   const total = Number(booking.amount_total ?? 0);
 
+  // Pre-load slots for the booking's current date so the panel is useful
+  // immediately (respecting the assigned staff and excluding this booking).
+  let initialSlots: string[] = [];
+  if (canManage) {
+    try {
+      initialSlots = await getAvailableSlots(
+        booking.business_id,
+        booking.service_id,
+        initialDate,
+        booking.staff_id,
+        booking.id
+      );
+    } catch {
+      initialSlots = [];
+    }
+  }
+
   return (
     <Shell>
       <h1 className="text-lg font-semibold">Manage your booking</h1>
@@ -144,6 +162,7 @@ export default async function ManageBookingPage({
             token={token}
             timeZone={timeZone}
             initialDate={initialDate}
+            initialSlots={initialSlots}
             todayKey={todayKey}
             businessHours={`${booking.business.business_hours_start} – ${booking.business.business_hours_end}`}
           />

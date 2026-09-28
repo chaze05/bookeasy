@@ -10,6 +10,13 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-09-27 — Solo-business staff UX + reschedule/staff consistency (branch `feat/staff-booking-readiness`)
+- Staff picker in the booking dialog now only renders with **2+ active staff**; a solo business (1 staff) auto-assigns silently. "Meet the Team" section also hidden until 2+ staff.
+- Fixed an underlying bug: the customer reschedule flow ignored the assigned staff. `getManageSlots` now passes the booking's staff and excludes the booking itself from conflicts; `rescheduleBooking` validates the chosen slot against the staff-aware availability and uses a staff-overlap-safe atomic update (falling back to business capacity for unassigned bookings).
+- Manage page now preloads the booking date's slots server-side, so the panel is useful immediately instead of "choose a date" first.
+- Relaxed circular risk: `getAvailableSlots(..., staffId?, excludeBookingId?)` gains an optional exclusion used by the manage flow.
+- Verified end-to-end with Playwright against a production build (11/11 checks): booking assigned to Sarah → manage page offers only Sarah's windows (10:30 AM yes, Maria-only 3:00 PM no) → reschedule to 10:30 succeeds and keeps Sarah; with 2 staff the picker + team section show; with 1 active staff both disappear.
+
 ### 2026-09-27 — Subscription plan enforcement (branch `feat/staff-booking-readiness`)
 - `migration_014.sql` (applied live): `businesses.plan` (`free/pro/business`), `businesses.plan_expires_at`, `subscription_payments.plan`; demo businesses set to `business`.
 - `src/lib/plans.ts` — single source of truth for limits/features: Starter (1 staff, 50 bookings/mo, no online payments/deposits/reminders/reports), Pro (5 staff, everything), Business (unlimited). Expired paid plans fall back to free automatically.

@@ -48,7 +48,8 @@ function initials(name: string) {
 }
 
 export function StaffSection({ staff }: StaffSectionProps) {
-  if (staff.length === 0) return null;
+  // A solo business has no team to introduce — hide until there are 2+.
+  if (staff.length < 2) return null;
 
   return (
     <section id="team" className="bg-zinc-900/40 px-6 py-24">

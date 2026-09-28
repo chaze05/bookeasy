@@ -36,7 +36,15 @@ async function loadBookingByToken(token: string) {
 export async function getManageSlots(token: string, dateStr: string): Promise<string[]> {
   const booking = await loadBookingByToken(token);
   if (!MANAGEABLE_STATUSES.includes(booking.status)) return [];
-  return getAvailableSlots(booking.business_id, booking.service_id, dateStr);
+  // Respect the staff member this booking is assigned to, and ignore the
+  // booking itself when checking conflicts (it is the one being moved).
+  return getAvailableSlots(
+    booking.business_id,
+    booking.service_id,
+    dateStr,
+    booking.staff_id,
+    booking.id
+  );
 }
 
 export async function rescheduleBooking(
@@ -74,29 +82,69 @@ export async function rescheduleBooking(
   const endsAt = new Date(startsAt.getTime() + booking.service.duration * 60_000);
   if (startsAt <= new Date()) throw new Error("Cannot move a booking into the past.");
 
-  // Atomic slot lock + capacity check + update, pooler-safe (single statement).
-  const updated = await prisma.$queryRaw<Array<{ id: string }>>`
-    WITH slot_lock AS (
-      SELECT pg_advisory_xact_lock(
-        hashtext(${booking.business_id}),
-        hashtext(${startsAt.toISOString()})
+  // The chosen time must be genuinely available for the assigned staff
+  // (or for some staff when unassigned) — the booking itself is excluded.
+  const available = await getAvailableSlots(
+    booking.business_id,
+    booking.service_id,
+    dateStr,
+    booking.staff_id,
+    booking.id
+  );
+  if (!available.includes(timeStr)) {
+    throw new Error("That time is not available. Please choose another slot.");
+  }
+
+  // Atomic slot lock + conflict check + update, pooler-safe (single statement).
+  let updated: Array<{ id: string }>;
+  if (booking.staff_id) {
+    updated = await prisma.$queryRaw<Array<{ id: string }>>`
+      WITH slot_lock AS (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${booking.business_id}),
+          hashtext(${startsAt.toISOString()})
+        )
       )
-    )
-    UPDATE bookings
-    SET starts_at = ${startsAt}::timestamptz,
-        ends_at = ${endsAt}::timestamptz,
-        updated_at = now()
-    WHERE id = ${booking.id}::uuid
-      AND status IN ('pending', 'confirmed')
-      AND (
-        SELECT count(*) FROM bookings
-        WHERE business_id = ${booking.business_id}::uuid
-          AND starts_at = ${startsAt}::timestamptz
-          AND status <> 'cancelled'
-          AND id <> ${booking.id}::uuid
-      ) < ${booking.business.max_bookings_per_slot}
-    RETURNING id
-  `;
+      UPDATE bookings
+      SET starts_at = ${startsAt}::timestamptz,
+          ends_at = ${endsAt}::timestamptz,
+          updated_at = now()
+      WHERE id = ${booking.id}::uuid
+        AND status IN ('pending', 'confirmed')
+        AND NOT EXISTS (
+          SELECT 1 FROM bookings existing
+          WHERE existing.staff_id = ${booking.staff_id}::uuid
+            AND existing.status <> 'cancelled'
+            AND existing.id <> ${booking.id}::uuid
+            AND existing.starts_at < ${endsAt}::timestamptz
+            AND existing.ends_at > ${startsAt}::timestamptz
+        )
+      RETURNING id
+    `;
+  } else {
+    updated = await prisma.$queryRaw<Array<{ id: string }>>`
+      WITH slot_lock AS (
+        SELECT pg_advisory_xact_lock(
+          hashtext(${booking.business_id}),
+          hashtext(${startsAt.toISOString()})
+        )
+      )
+      UPDATE bookings
+      SET starts_at = ${startsAt}::timestamptz,
+          ends_at = ${endsAt}::timestamptz,
+          updated_at = now()
+      WHERE id = ${booking.id}::uuid
+        AND status IN ('pending', 'confirmed')
+        AND (
+          SELECT count(*) FROM bookings
+          WHERE business_id = ${booking.business_id}::uuid
+            AND starts_at = ${startsAt}::timestamptz
+            AND status <> 'cancelled'
+            AND id <> ${booking.id}::uuid
+        ) < ${booking.business.max_bookings_per_slot}
+      RETURNING id
+    `;
+  }
 
   if (updated.length === 0) {
     throw new Error("That slot is no longer available. Please choose another time.");
