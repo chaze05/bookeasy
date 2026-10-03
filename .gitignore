@@ -45,3 +45,4 @@ src/generated/
 
 .vercel
 .test-tools/
+supabase/.temp/
