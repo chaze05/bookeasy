@@ -146,6 +146,7 @@ export async function getAvailableSlots(
         business_hours_end: true,
         booking_interval: true,
         max_bookings_per_slot: true,
+        allow_multiple_bookings: true,
         timezone: true,
       },
     }),
@@ -182,6 +183,10 @@ export async function getAvailableSlots(
   if (schedule.staffIds.length === 0) {
     if (staffId) return [];
 
+    // "Allow multiple bookings" gates the configured max; otherwise one guest
+    // per slot. This covers class/table-style reservations without staff.
+    const capacity = business.allow_multiple_bookings ? business.max_bookings_per_slot : 1;
+
     const existingBookings = await prisma.booking.findMany({
       where: {
         business_id: businessId,
@@ -200,7 +205,7 @@ export async function getAvailableSlots(
     const fallbackSlots: string[] = [];
     for (let t = startMinutes; t + service.duration <= endMinutes; t += interval) {
       if (isToday && t <= nowMinutes) continue;
-      if ((slotCounts.get(t) ?? 0) < business.max_bookings_per_slot) {
+      if ((slotCounts.get(t) ?? 0) < capacity) {
         fallbackSlots.push(`${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`);
       }
     }
@@ -262,6 +267,7 @@ export async function createPublicBooking(
         currency: true,
         timezone: true,
         max_bookings_per_slot: true,
+        allow_multiple_bookings: true,
         business_hours_start: true,
         business_hours_end: true,
         booking_interval: true,
@@ -422,6 +428,12 @@ export async function createPublicBooking(
   // A single statement is its own implicit transaction, so the xact-scoped
   // lock is held for the whole check-and-insert. This avoids interactive
   // transactions, which are unreliable through the Supabase transaction pooler.
+  // Business-level capacity for the no-staff path: "allow multiple bookings"
+  // gates the configured maximum, otherwise one guest per slot.
+  const businessCapacity = business.allow_multiple_bookings
+    ? business.max_bookings_per_slot
+    : 1;
+
   let inserted: Array<{ id: string }>;
   try {
     if (assignedStaffId) {
@@ -504,7 +516,7 @@ export async function createPublicBooking(
           WHERE business_id = ${businessId}::uuid
             AND starts_at = ${startsAt}::timestamptz
             AND status <> 'cancelled'
-        ) < ${business.max_bookings_per_slot}
+        ) < ${businessCapacity}
         RETURNING id
       `;
     }

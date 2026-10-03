@@ -21,6 +21,7 @@ async function loadBookingByToken(token: string) {
           name: true,
           timezone: true,
           max_bookings_per_slot: true,
+          allow_multiple_bookings: true,
           business_hours_start: true,
           business_hours_end: true,
           booking_interval: true,
@@ -141,7 +142,7 @@ export async function rescheduleBooking(
             AND starts_at = ${startsAt}::timestamptz
             AND status <> 'cancelled'
             AND id <> ${booking.id}::uuid
-        ) < ${booking.business.max_bookings_per_slot}
+        ) < ${booking.business.allow_multiple_bookings ? booking.business.max_bookings_per_slot : 1}
       RETURNING id
     `;
   }

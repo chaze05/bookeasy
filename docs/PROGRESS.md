@@ -10,6 +10,17 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-03 — Dynamic booking models: staff-less / class & table capacity (branch `feat/staff-booking-readiness`)
+- Fixed a real gap: `allow_multiple_bookings` was never enforced — capacity always used `max_bookings_per_slot`. Now capacity = `allow_multiple_bookings ? max_bookings_per_slot : 1` in slot listing, booking insert, and unassigned reschedules.
+- Verified the platform across booking models with a production build (12/12 checks):
+  - **Staff-less single capacity** (solo/resource): first booking accepted, second in the same slot rejected.
+  - **Class / table mode** (no staff, allow multiple, max 3): three guests accepted, fourth rejected.
+  - **Reminders** work for staff-less businesses (cron sent 4).
+  - **Staff-less reschedule** via the customer manage page moved 1 PM → 1:30 PM and stayed unassigned.
+  - **Staff-based model** previously verified 11/11 (windows, auto-assign, blocks, staff-aware reschedule).
+- Added `.test-tools/` to `.gitignore` (Playwright + test scripts live there, kept out of the repo).
+- Known limitations (future work if needed): overnight business hours (e.g. 18:00–02:00) unsupported; no party-size per booking; service-level capacity/staff mapping; "Staff" terminology is fixed (resources can still be modelled as staff entries, e.g. "Room A").
+
 ### 2026-09-27 — Solo-business staff UX + reschedule/staff consistency (branch `feat/staff-booking-readiness`)
 - Staff picker in the booking dialog now only renders with **2+ active staff**; a solo business (1 staff) auto-assigns silently. "Meet the Team" section also hidden until 2+ staff.
 - Fixed an underlying bug: the customer reschedule flow ignored the assigned staff. `getManageSlots` now passes the booking's staff and excludes the booking itself from conflicts; `rescheduleBooking` validates the chosen slot against the staff-aware availability and uses a staff-overlap-safe atomic update (falling back to business capacity for unassigned bookings).
