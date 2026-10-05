@@ -57,6 +57,11 @@ export default async function BookingPage({
           color: true,
           party_size_enabled: true,
           max_party_size: true,
+          addons: {
+            where: { is_active: true },
+            orderBy: { sort_order: "asc" },
+            select: { id: true, name: true, price: true, max_quantity: true },
+          },
         },
         orderBy: { name: "asc" },
       },
@@ -75,7 +80,11 @@ export default async function BookingPage({
 
   if (!business) notFound();
 
-  const services = business.services.map((s) => ({ ...s, price: Number(s.price) }));
+  const services = business.services.map((s) => ({
+    ...s,
+    price: Number(s.price),
+    addons: s.addons.map((addon) => ({ ...addon, price: Number(addon.price) })),
+  }));
 
   return (
     <main className="min-h-screen bg-zinc-950">

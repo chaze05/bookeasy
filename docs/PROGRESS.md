@@ -10,6 +10,17 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-03 — Add-ons / extras (branch `feat/booking-rules-party-addons`)
+- Dashboard → Services: each service card now has an **Extras** button opening a dialog to add/toggle/remove add-ons (name, price, max quantity) — `src/actions/addons.ts`, owner-scoped and validated.
+- Public widget: "Extras (optional)" list with quantity steppers (0..max) and a live extras subtotal; services without extras are unaffected.
+- Booking engine: extras are re-priced server-side (client prices ignored), quantities validated against `max_quantity`, unknown/inactive add-ons rejected; `amount_total` = service + extras, so deposits and PayMongo charge the correct amount.
+- `booking_addons` stores name/price/qty snapshots (frozen at booking time); owner email shows "Extras: …", customer manage page lists the extras.
+- Verified end-to-end with a live matrix (12/12): no extras → ₱40; 2×Paddle + 1×Coaching → ₱240 with snapshots; over-max rejected; unknown add-on rejected; 50% deposit on ₱140 → ₱70. Screenshots: 21 extras dialog, 22 widget extras.
+
+### 2026-10-03 — Branch summary so far (`feat/booking-rules-party-addons`, stacked on `feat/staff-booking-readiness`)
+- Booking rules (minimum notice, horizon, turnover buffer), party size with seat-based capacity, and add-ons are all implemented, tested against the live database, typechecked/linted/built clean.
+- Ready to merge to production together with the staff/plans/reminders branch when you approve.
+
 ### 2026-10-03 — Booking rules + party size / seats (branch `feat/booking-rules-party-addons`)
 - `migration_016.sql` (applied live): `businesses.min_lead_hours / booking_horizon_days / buffer_minutes`, `services.party_size_enabled / max_party_size / seats_per_slot`, `bookings.party_size`, plus `service_addons` + `booking_addons` tables (schema ready for the add-ons batch).
 - **Booking rules** enforced in slot listing, booking, and reschedule:

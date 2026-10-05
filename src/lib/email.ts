@@ -266,6 +266,7 @@ export async function sendOwnerNewBookingEmail({
   depositAmount,
   balanceAmount,
   partySize,
+  extras,
   date,
   time,
   notes,
@@ -283,6 +284,7 @@ export async function sendOwnerNewBookingEmail({
   depositAmount?: string;
   balanceAmount?: string;
   partySize?: number;
+  extras?: string;
   date: string;
   time: string;
   notes?: string | null;
@@ -305,6 +307,7 @@ export async function sendOwnerNewBookingEmail({
       depositAmount,
       balanceAmount,
       partySize,
+      extras,
       date,
       time,
       notes,

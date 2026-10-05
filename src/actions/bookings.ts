@@ -425,6 +425,57 @@ export async function createPublicBooking(
     }
   }
 
+  // Extras / add-ons: prices always come from the database, never the client.
+  let extrasTotal = 0;
+  const validatedAddons: Array<{ id: string; name: string; price: number; quantity: number }> = [];
+  {
+    let selections: Array<{ id: string; quantity: number }> = [];
+    try {
+      const raw = JSON.parse(String(formData.get("addons") ?? "[]"));
+      if (Array.isArray(raw)) {
+        selections = raw
+          .map((entry) => ({
+            id: String((entry as { id?: unknown })?.id ?? ""),
+            quantity: Math.floor(Number((entry as { quantity?: unknown })?.quantity ?? 0)),
+          }))
+          .filter((entry) => entry.id && entry.quantity > 0);
+      }
+    } catch {
+      selections = [];
+    }
+
+    if (selections.length > 0) {
+      const addonRows = await prisma.serviceAddon.findMany({
+        where: {
+          id: { in: selections.map((selection) => selection.id) },
+          service_id: serviceId,
+          business_id: businessId,
+          is_active: true,
+        },
+        select: { id: true, name: true, price: true, max_quantity: true },
+      });
+      const addonById = new Map(addonRows.map((addon) => [addon.id, addon]));
+
+      for (const selection of selections) {
+        const addon = addonById.get(selection.id);
+        if (!addon) {
+          throw new Error("One of the selected extras is no longer available.");
+        }
+        if (selection.quantity > addon.max_quantity) {
+          throw new Error(`Too many "${addon.name}" selected (max ${addon.max_quantity}).`);
+        }
+        const price = Number(addon.price);
+        extrasTotal += price * selection.quantity;
+        validatedAddons.push({
+          id: addon.id,
+          name: addon.name,
+          price,
+          quantity: selection.quantity,
+        });
+      }
+    }
+  }
+
   // Staff assignment: honour the customer's choice, otherwise auto-assign a
   // free staff member. Availability windows, blocked dates and existing
   // bookings are all respected.
@@ -467,7 +518,7 @@ export async function createPublicBooking(
     }
   }
 
-  const amountTotal = Number(service.price);
+  const amountTotal = Number(service.price) + extrasTotal;
   const rawDeposit = Number(business.deposit_value);
   let depositAmount = 0;
   if (business.deposit_type === "percent" && rawDeposit > 0) {
@@ -653,6 +704,29 @@ export async function createPublicBooking(
     throw new Error("This slot is no longer available. Please choose another time.");
   }
 
+  // Persist the chosen extras as snapshots (name/price frozen at booking time).
+  if (validatedAddons.length > 0) {
+    try {
+      await prisma.bookingAddon.createMany({
+        data: validatedAddons.map((addon) => ({
+          booking_id: bookingId,
+          addon_id: addon.id,
+          name: addon.name,
+          price: addon.price,
+          quantity: addon.quantity,
+        })),
+      });
+    } catch (error) {
+      await prisma.booking.delete({ where: { id: bookingId } }).catch(() => {});
+      console.error("[createPublicBooking] booking add-ons failed:", error);
+      throw error;
+    }
+  }
+
+  const extrasSummary = validatedAddons
+    .map((addon) => `${addon.name} ×${addon.quantity}`)
+    .join(", ");
+
   const dateLabel = formatZonedDate(startsAt, timeZone, { dateStyle: "long" });
   const timeLabel = formatZonedTime(startsAt, timeZone);
 
@@ -736,6 +810,7 @@ export async function createPublicBooking(
           depositAmount: depositAmount.toFixed(2),
           balanceAmount: (amountTotal - depositAmount).toFixed(2),
           partySize,
+          extras: extrasSummary || undefined,
           date: dateLabel,
           time: timeLabel,
           notes,

@@ -18,13 +18,28 @@ export default async function ServicesPage() {
   });
 
   let services: Service[] = [];
+  let addons: {
+    id: string;
+    service_id: string;
+    name: string;
+    price: number;
+    max_quantity: number;
+    is_active: boolean;
+  }[] = [];
 
   if (business) {
-    const raw = await prisma.service.findMany({
-      where: { business_id: business.id },
-      orderBy: { created_at: "asc" },
-    });
+    const [raw, rawAddons] = await Promise.all([
+      prisma.service.findMany({
+        where: { business_id: business.id },
+        orderBy: { created_at: "asc" },
+      }),
+      prisma.serviceAddon.findMany({
+        where: { business_id: business.id },
+        orderBy: { sort_order: "asc" },
+      }),
+    ]);
     services = serialize(raw) as unknown as Service[];
+    addons = serialize(rawAddons) as unknown as typeof addons;
   }
 
   return (
@@ -37,7 +52,7 @@ export default async function ServicesPage() {
           </p>
         </div>
       </div>
-      <ServiceList services={services} />
+      <ServiceList services={services} addons={addons} />
     </div>
   );
 }

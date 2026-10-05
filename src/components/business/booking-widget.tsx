@@ -41,6 +41,7 @@ export interface BookingService {
   color: string;
   party_size_enabled?: boolean;
   max_party_size?: number;
+  addons?: { id: string; name: string; price: number; max_quantity: number }[];
 }
 
 export interface PaymentMethodData {
@@ -133,6 +134,7 @@ export function BookingWidget({
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [partySize, setPartySize] = useState(1);
+  const [addonQty, setAddonQty] = useState<Record<string, number>>({});
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -145,6 +147,7 @@ export function BookingWidget({
     setSelectedStaffId("");
     setForm({ name: "", email: "", phone: "", notes: "" });
     setPartySize(1);
+    setAddonQty({});
     setSelectedPaymentType(paymentMethods[0]?.type ?? null);
     setPaymentProof(null);
   }
@@ -193,6 +196,10 @@ export function BookingWidget({
       if (activePaymentMethod) fd.append("paymentMethodId", activePaymentMethod.id);
       if (selectedStaffId) fd.append("staffId", selectedStaffId);
       if (service.party_size_enabled) fd.append("partySize", String(partySize));
+      const selectedAddons = (service.addons ?? [])
+        .map((addon) => ({ id: addon.id, quantity: addonQty[addon.id] ?? 0 }))
+        .filter((entry) => entry.quantity > 0);
+      if (selectedAddons.length > 0) fd.append("addons", JSON.stringify(selectedAddons));
       if (proof) fd.append("paymentProof", proof);
       try {
         const result = await createPublicBooking(fd);
@@ -233,7 +240,12 @@ export function BookingWidget({
   );
   const isOnlineCheckout = activePaymentMethod?.type === "paymongo";
 
-  const totalAmount = service.price;
+  const extras = service.addons ?? [];
+  const extrasTotal = extras.reduce(
+    (sum, addon) => sum + (addonQty[addon.id] ?? 0) * addon.price,
+    0
+  );
+  const totalAmount = service.price + extrasTotal;
   const rawDeposit = Number(business.deposit_value ?? 0);
   const configuredDeposit =
     business.deposit_type === "percent"
@@ -451,6 +463,54 @@ export function BookingWidget({
                         +
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {extras.length > 0 && (
+                  <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
+                    <p className="text-xs font-medium text-zinc-300">Extras (optional)</p>
+                    {extras.map((addon) => {
+                      const qty = addonQty[addon.id] ?? 0;
+                      return (
+                        <div key={addon.id} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-zinc-200">{addon.name}</p>
+                            <p className="text-[11px] text-zinc-500">
+                              {formatMoney(addon.price, business.currency)} each
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAddonQty((prev) => ({ ...prev, [addon.id]: Math.max(0, qty - 1) }))
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800"
+                            >
+                              −
+                            </button>
+                            <span className="w-6 text-center text-sm font-semibold text-zinc-100">{qty}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAddonQty((prev) => ({
+                                  ...prev,
+                                  [addon.id]: Math.min(addon.max_quantity, qty + 1),
+                                }))
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {extrasTotal > 0 && (
+                      <p className="border-t border-zinc-800 pt-2 text-right text-xs text-zinc-400">
+                        Extras: {formatMoney(extrasTotal, business.currency)}
+                      </p>
+                    )}
                   </div>
                 )}
 

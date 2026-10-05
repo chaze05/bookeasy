@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarCheck, CheckCircle2, Clock, MapPin } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Clock, MapPin, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyManageToken } from "@/lib/booking-tokens";
 import { getAvailableSlots } from "@/actions/bookings";
@@ -78,6 +78,7 @@ export default async function ManageBookingPage({
         },
       },
       service: { select: { name: true, duration: true } },
+      addons: true,
     },
   });
 
@@ -142,6 +143,12 @@ export default async function ManageBookingPage({
             <MapPin className="h-3.5 w-3.5" />
             Times shown in {timeZone}
           </span>
+          {booking.addons.length > 0 && (
+            <span className="flex items-center gap-2 text-xs text-zinc-500">
+              <Sparkles className="h-3.5 w-3.5 text-zinc-600" />
+              {booking.addons.map((addon) => `${addon.name} ×${addon.quantity}`).join(" · ")}
+            </span>
+          )}
         </div>
         {total > 0 && (
           <div className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">

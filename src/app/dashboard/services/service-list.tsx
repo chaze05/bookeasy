@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2, Loader2, Scissors, Clock, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Scissors, Clock, DollarSign, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { createService, updateService, deleteService, toggleService } from "@/actions/services";
+import { createAddon, deleteAddon, toggleAddon } from "@/actions/addons";
 import { serviceSchema, type ServiceInput } from "@/lib/validations";
 import type { Service } from "@/types";
 
@@ -186,11 +187,174 @@ function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormPr
 
 interface ServiceCardProps {
   service: Service;
+  addons: {
+    id: string;
+    service_id: string;
+    name: string;
+    price: number;
+    max_quantity: number;
+    is_active: boolean;
+  }[];
 }
 
-function ServiceCard({ service }: ServiceCardProps) {
+function ExtrasDialog({
+  service,
+  addons,
+  open,
+  onOpenChange,
+}: {
+  service: Service;
+  addons: ServiceCardProps["addons"];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [maxQuantity, setMaxQuantity] = useState(1);
+  const [isPending, startTransition] = useTransition();
+
+  const inputClass =
+    "border-zinc-700 bg-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20";
+
+  function add() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("service_id", service.id);
+      fd.set("name", name);
+      fd.set("price", price || "0");
+      fd.set("max_quantity", String(maxQuantity));
+      try {
+        await createAddon(fd);
+        toast.success("Extra added");
+        setName("");
+        setPrice("");
+        setMaxQuantity(1);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to add extra");
+      }
+    });
+  }
+
+  function remove(id: string) {
+    startTransition(async () => {
+      try {
+        await deleteAddon(id);
+        toast.success("Extra removed");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to remove");
+      }
+    });
+  }
+
+  function toggle(id: string, checked: boolean) {
+    startTransition(async () => {
+      try {
+        await toggleAddon(id, checked);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to update");
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Extras for {service.name}</DialogTitle>
+          <DialogDescription>
+            Optional add-ons customers can pick when booking (paddle rental, coaching, upsells).
+          </DialogDescription>
+        </DialogHeader>
+
+        {addons.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {addons.map((addon) => (
+              <div
+                key={addon.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-200">{addon.name}</p>
+                  <p className="text-xs text-zinc-500">
+                    ₱{Number(addon.price).toFixed(2)} · max {addon.max_quantity}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={addon.is_active}
+                    onCheckedChange={(checked) => toggle(addon.id, checked)}
+                    disabled={isPending}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => remove(addon.id)}
+                    disabled={isPending}
+                    className="text-zinc-500 hover:text-red-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
+            No extras yet. Add one below.
+          </p>
+        )}
+
+        <div className="grid grid-cols-[1fr_5rem_4rem_auto] items-end gap-2 border-t border-zinc-800 pt-4">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-zinc-400">Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Paddle rental"
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-zinc-400">Price</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-zinc-400">Max qty</Label>
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={maxQuantity}
+              onChange={(e) => setMaxQuantity(Number(e.target.value))}
+              className={inputClass}
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={add}
+            disabled={isPending || name.trim().length < 2}
+            className="gap-1 bg-emerald-500 text-white hover:bg-emerald-400"
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Add
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ServiceCard({ service, addons }: ServiceCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleToggle(checked: boolean) {
@@ -242,6 +406,15 @@ function ServiceCard({ service }: ServiceCardProps) {
               )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setExtrasOpen(true)}
+                title="Extras / add-ons"
+                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-amber-400"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -307,6 +480,14 @@ function ServiceCard({ service }: ServiceCardProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Extras / add-ons */}
+      <ExtrasDialog
+        service={service}
+        addons={addons}
+        open={extrasOpen}
+        onOpenChange={setExtrasOpen}
+      />
+
       {/* Delete confirmation */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-sm">
@@ -339,9 +520,17 @@ function ServiceCard({ service }: ServiceCardProps) {
 
 interface ServiceListProps {
   services: Service[];
+  addons: {
+    id: string;
+    service_id: string;
+    name: string;
+    price: number;
+    max_quantity: number;
+    is_active: boolean;
+  }[];
 }
 
-export function ServiceList({ services }: ServiceListProps) {
+export function ServiceList({ services, addons }: ServiceListProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -379,7 +568,11 @@ export function ServiceList({ services }: ServiceListProps) {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence>
             {services.map((service) => (
-              <ServiceCard key={service.id} service={service} />
+              <ServiceCard
+                key={service.id}
+                service={service}
+                addons={addons.filter((addon) => addon.service_id === service.id)}
+              />
             ))}
           </AnimatePresence>
         </div>
