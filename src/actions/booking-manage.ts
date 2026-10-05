@@ -22,12 +22,21 @@ async function loadBookingByToken(token: string) {
           timezone: true,
           max_bookings_per_slot: true,
           allow_multiple_bookings: true,
+          buffer_minutes: true,
           business_hours_start: true,
           business_hours_end: true,
           booking_interval: true,
         },
       },
-      service: { select: { id: true, name: true, duration: true } },
+      service: {
+        select: {
+          id: true,
+          name: true,
+          duration: true,
+          party_size_enabled: true,
+          seats_per_slot: true,
+        },
+      },
     },
   });
   if (!booking) throw new Error("We couldn't find this booking.");
@@ -117,34 +126,64 @@ export async function rescheduleBooking(
           WHERE existing.staff_id = ${booking.staff_id}::uuid
             AND existing.status <> 'cancelled'
             AND existing.id <> ${booking.id}::uuid
-            AND existing.starts_at < ${endsAt}::timestamptz
-            AND existing.ends_at > ${startsAt}::timestamptz
+            AND existing.starts_at < ${endsAt}::timestamptz + make_interval(mins => ${booking.business.buffer_minutes})
+            AND existing.ends_at > ${startsAt}::timestamptz - make_interval(mins => ${booking.business.buffer_minutes})
         )
       RETURNING id
     `;
   } else {
-    updated = await prisma.$queryRaw<Array<{ id: string }>>`
-      WITH slot_lock AS (
-        SELECT pg_advisory_xact_lock(
-          hashtext(${booking.business_id}),
-          hashtext(${startsAt.toISOString()})
-        )
-      )
-      UPDATE bookings
-      SET starts_at = ${startsAt}::timestamptz,
-          ends_at = ${endsAt}::timestamptz,
-          updated_at = now()
-      WHERE id = ${booking.id}::uuid
-        AND status IN ('pending', 'confirmed')
-        AND (
-          SELECT count(*) FROM bookings
-          WHERE business_id = ${booking.business_id}::uuid
-            AND starts_at = ${startsAt}::timestamptz
-            AND status <> 'cancelled'
-            AND id <> ${booking.id}::uuid
-        ) < ${booking.business.allow_multiple_bookings ? booking.business.max_bookings_per_slot : 1}
-      RETURNING id
-    `;
+    const capacity = booking.business.allow_multiple_bookings
+      ? booking.business.max_bookings_per_slot
+      : 1;
+    const seatsMode = booking.service.party_size_enabled && booking.service.seats_per_slot != null;
+
+    updated = seatsMode
+      ? await prisma.$queryRaw<Array<{ id: string }>>`
+          WITH slot_lock AS (
+            SELECT pg_advisory_xact_lock(
+              hashtext(${booking.business_id}),
+              hashtext(${startsAt.toISOString()})
+            )
+          )
+          UPDATE bookings
+          SET starts_at = ${startsAt}::timestamptz,
+              ends_at = ${endsAt}::timestamptz,
+              updated_at = now()
+          WHERE id = ${booking.id}::uuid
+            AND status IN ('pending', 'confirmed')
+            AND (
+              SELECT COALESCE(SUM(party_size), 0) FROM bookings
+              WHERE business_id = ${booking.business_id}::uuid
+                AND status <> 'cancelled'
+                AND id <> ${booking.id}::uuid
+                AND starts_at < ${endsAt}::timestamptz + make_interval(mins => ${booking.business.buffer_minutes})
+                AND ends_at > ${startsAt}::timestamptz - make_interval(mins => ${booking.business.buffer_minutes})
+            ) + ${booking.party_size} <= ${booking.service.seats_per_slot ?? 0}
+          RETURNING id
+        `
+      : await prisma.$queryRaw<Array<{ id: string }>>`
+          WITH slot_lock AS (
+            SELECT pg_advisory_xact_lock(
+              hashtext(${booking.business_id}),
+              hashtext(${startsAt.toISOString()})
+            )
+          )
+          UPDATE bookings
+          SET starts_at = ${startsAt}::timestamptz,
+              ends_at = ${endsAt}::timestamptz,
+              updated_at = now()
+          WHERE id = ${booking.id}::uuid
+            AND status IN ('pending', 'confirmed')
+            AND (
+              SELECT count(*) FROM bookings
+              WHERE business_id = ${booking.business_id}::uuid
+                AND status <> 'cancelled'
+                AND id <> ${booking.id}::uuid
+                AND starts_at < ${endsAt}::timestamptz + make_interval(mins => ${booking.business.buffer_minutes})
+                AND ends_at > ${startsAt}::timestamptz - make_interval(mins => ${booking.business.buffer_minutes})
+            ) < ${capacity}
+          RETURNING id
+        `;
   }
 
   if (updated.length === 0) {

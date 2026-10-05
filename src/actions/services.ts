@@ -27,6 +27,9 @@ export async function createService(formData: FormData) {
     duration: formData.get("duration"),
     price: formData.get("price"),
     color: formData.get("color"),
+    party_size_enabled: formData.get("party_size_enabled"),
+    max_party_size: formData.get("max_party_size"),
+    seats_per_slot: formData.get("seats_per_slot"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
@@ -48,6 +51,9 @@ export async function updateService(id: string, formData: FormData) {
     duration: formData.get("duration"),
     price: formData.get("price"),
     color: formData.get("color"),
+    party_size_enabled: formData.get("party_size_enabled"),
+    max_party_size: formData.get("max_party_size"),
+    seats_per_slot: formData.get("seats_per_slot"),
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 

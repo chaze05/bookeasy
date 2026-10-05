@@ -29,6 +29,18 @@ function timeToMinutes(value: Date): number {
   return value.getUTCHours() * 60 + value.getUTCMinutes();
 }
 
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+function slotStartMs(dateKey: string, minutes: number, timeZone: string): number {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return zonedTimeToUtc(year, month, day, Math.floor(minutes / 60), minutes % 60, timeZone).getTime();
+}
+
 interface StaffSchedule {
   windowsByStaff: Map<string, Array<[number, number]>>;
   busyByStaff: Map<string, Array<[number, number]>>;
@@ -45,7 +57,8 @@ async function loadStaffSchedule(
   dateKey: string,
   timeZone: string,
   staffFilter?: string | null,
-  excludeBookingId?: string | null
+  excludeBookingId?: string | null,
+  bufferMinutes = 0
 ): Promise<StaffSchedule> {
   const [year, month, day] = dateKey.split("-").map(Number);
   const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
@@ -103,7 +116,8 @@ async function loadStaffSchedule(
     const durationMinutes = Math.round(
       (new Date(booking.ends_at).getTime() - new Date(booking.starts_at).getTime()) / 60_000
     );
-    const interval: [number, number] = [start, start + durationMinutes];
+    // Expand by the turnover buffer so back-to-back bookings leave a gap.
+    const interval: [number, number] = [start - bufferMinutes, start + durationMinutes + bufferMinutes];
     const existing = busyByStaff.get(booking.staff_id) ?? [];
     existing.push(interval);
     busyByStaff.set(booking.staff_id, existing);
@@ -147,12 +161,15 @@ export async function getAvailableSlots(
         booking_interval: true,
         max_bookings_per_slot: true,
         allow_multiple_bookings: true,
+        min_lead_hours: true,
+        booking_horizon_days: true,
+        buffer_minutes: true,
         timezone: true,
       },
     }),
     prisma.service.findUnique({
       where: { id: serviceId, business_id: businessId, is_active: true },
-      select: { duration: true },
+      select: { duration: true, party_size_enabled: true, seats_per_slot: true },
     }),
   ]);
   if (!business || !service) return [];
@@ -160,6 +177,7 @@ export async function getAvailableSlots(
   const timeZone = safeTimeZone(business.timezone);
   const todayKey = getZonedDateKey(new Date(), timeZone);
   if (dateStr < todayKey) return [];
+  if (dateStr > addDaysToDateKey(todayKey, business.booking_horizon_days)) return [];
 
   let dayRange: { start: Date; end: Date };
   try {
@@ -173,10 +191,19 @@ export async function getAvailableSlots(
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
   const interval = business.booking_interval;
-  const isToday = dateStr === todayKey;
-  const nowMinutes = isToday ? getZonedMinutes(new Date(), timeZone) : -1;
+  const leadCutoffMs = Date.now() + business.min_lead_hours * 60 * 60 * 1000;
+  const bufferMs = business.buffer_minutes * 60 * 1000;
+  const slotLabel = (t: number) =>
+    `${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`;
 
-  const schedule = await loadStaffSchedule(businessId, dateStr, timeZone, staffId, excludeBookingId);
+  const schedule = await loadStaffSchedule(
+    businessId,
+    dateStr,
+    timeZone,
+    staffId,
+    excludeBookingId,
+    business.buffer_minutes
+  );
   if (schedule.businessBlocked) return [];
 
   // No staff (or none matching): fall back to business capacity per slot.
@@ -184,37 +211,48 @@ export async function getAvailableSlots(
     if (staffId) return [];
 
     // "Allow multiple bookings" gates the configured max; otherwise one guest
-    // per slot. This covers class/table-style reservations without staff.
+    // per slot. With party size + seats, capacity is measured in seats.
     const capacity = business.allow_multiple_bookings ? business.max_bookings_per_slot : 1;
+    const seatsMode = service.party_size_enabled && service.seats_per_slot != null;
 
     const existingBookings = await prisma.booking.findMany({
       where: {
         business_id: businessId,
-        starts_at: { gte: dayRange.start, lt: dayRange.end },
         status: { not: "cancelled" },
+        // Overlap window expanded by the turnover buffer.
+        starts_at: { lt: new Date(dayRange.end.getTime() + bufferMs) },
+        ends_at: { gt: new Date(dayRange.start.getTime() - bufferMs) },
         ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
-      select: { starts_at: true },
+      select: { starts_at: true, ends_at: true, party_size: true },
     });
-    const slotCounts = new Map<number, number>();
-    for (const booking of existingBookings) {
-      const slotMin = getZonedMinutes(new Date(booking.starts_at), timeZone);
-      slotCounts.set(slotMin, (slotCounts.get(slotMin) ?? 0) + 1);
-    }
 
     const fallbackSlots: string[] = [];
     for (let t = startMinutes; t + service.duration <= endMinutes; t += interval) {
-      if (isToday && t <= nowMinutes) continue;
-      if ((slotCounts.get(t) ?? 0) < capacity) {
-        fallbackSlots.push(`${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`);
-      }
+      const startMs = slotStartMs(dateStr, t, timeZone);
+      if (startMs < leadCutoffMs) continue;
+      const endMs = startMs + service.duration * 60_000;
+
+      const overlapping = existingBookings.filter(
+        (booking) =>
+          new Date(booking.starts_at).getTime() < endMs + bufferMs &&
+          new Date(booking.ends_at).getTime() > startMs - bufferMs
+      );
+
+      const available = seatsMode
+        ? overlapping.reduce((sum, booking) => sum + (booking.party_size ?? 1), 0) + 1 <=
+          (service.seats_per_slot as number)
+        : overlapping.length < capacity;
+
+      if (available) fallbackSlots.push(slotLabel(t));
     }
     return fallbackSlots;
   }
 
   const slots: string[] = [];
   for (let t = startMinutes; t + service.duration <= endMinutes; t += interval) {
-    if (isToday && t <= nowMinutes) continue;
+    const startMs = slotStartMs(dateStr, t, timeZone);
+    if (startMs < leadCutoffMs) continue;
     const slotEnd = t + service.duration;
 
     const hasFreeStaff = schedule.staffIds.some((id) => {
@@ -227,7 +265,7 @@ export async function getAvailableSlots(
     });
 
     if (hasFreeStaff) {
-      slots.push(`${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`);
+      slots.push(slotLabel(t));
     }
   }
   return slots;
@@ -246,6 +284,7 @@ export async function createPublicBooking(
   const notes = (formData.get("notes") as string)?.trim() || null;
   const paymentMethodId = (formData.get("paymentMethodId") as string)?.trim() || null;
   const requestedStaffId = (formData.get("staffId") as string)?.trim() || null;
+  const partySizeRaw = Number(formData.get("partySize") ?? 1);
   const paymentProof = formData.get("paymentProof");
 
   if (!businessId || !serviceId || !dateStr || !timeStr || !customerName || !customerEmail) {
@@ -271,6 +310,9 @@ export async function createPublicBooking(
         business_hours_start: true,
         business_hours_end: true,
         booking_interval: true,
+        min_lead_hours: true,
+        booking_horizon_days: true,
+        buffer_minutes: true,
         deposit_type: true,
         deposit_value: true,
         paymongo_enabled: true,
@@ -281,7 +323,14 @@ export async function createPublicBooking(
     }),
     prisma.service.findUnique({
       where: { id: serviceId, business_id: businessId, is_active: true },
-      select: { name: true, duration: true, price: true },
+      select: {
+        name: true,
+        duration: true,
+        price: true,
+        party_size_enabled: true,
+        max_party_size: true,
+        seats_per_slot: true,
+      },
     }),
     prisma.paymentMethod.findMany({
       where: { business_id: businessId, is_enabled: true },
@@ -352,6 +401,29 @@ export async function createPublicBooking(
   const startsAt = zonedTimeToUtc(year, month, day, hour, minute, timeZone);
   const endsAt = new Date(startsAt.getTime() + service.duration * 60_000);
   if (startsAt <= new Date()) throw new Error("Cannot book in the past.");
+
+  // Booking rules: minimum lead time and how far ahead bookings open.
+  const leadCutoffMs = Date.now() + business.min_lead_hours * 60 * 60 * 1000;
+  if (startsAt.getTime() < leadCutoffMs) {
+    throw new Error(
+      business.min_lead_hours > 0
+        ? `Bookings need at least ${business.min_lead_hours} hour${business.min_lead_hours === 1 ? "" : "s"} notice.`
+        : "That time is too soon. Please pick a later slot."
+    );
+  }
+  const currentDateKey = getZonedDateKey(new Date(), timeZone);
+  if (dateStr > addDaysToDateKey(currentDateKey, business.booking_horizon_days)) {
+    throw new Error(`Bookings open up to ${business.booking_horizon_days} days ahead.`);
+  }
+
+  // Party size (only for services that ask for it).
+  let partySize = 1;
+  if (service.party_size_enabled) {
+    partySize = Number.isFinite(partySizeRaw) ? Math.floor(partySizeRaw) : 0;
+    if (partySize < 1 || partySize > service.max_party_size) {
+      throw new Error(`Please choose between 1 and ${service.max_party_size} guests.`);
+    }
+  }
 
   // Staff assignment: honour the customer's choice, otherwise auto-assign a
   // free staff member. Availability windows, blocked dates and existing
@@ -429,10 +501,12 @@ export async function createPublicBooking(
   // lock is held for the whole check-and-insert. This avoids interactive
   // transactions, which are unreliable through the Supabase transaction pooler.
   // Business-level capacity for the no-staff path: "allow multiple bookings"
-  // gates the configured maximum, otherwise one guest per slot.
+  // gates the configured maximum, otherwise one guest per slot. Services with
+  // party size + seats are capped by total seats instead of booking count.
   const businessCapacity = business.allow_multiple_bookings
     ? business.max_bookings_per_slot
     : 1;
+  const seatsMode = service.party_size_enabled && service.seats_per_slot != null;
 
   let inserted: Array<{ id: string }>;
   try {
@@ -449,7 +523,7 @@ export async function createPublicBooking(
         INSERT INTO bookings (
           id, business_id, service_id, staff_id, customer_name, customer_email,
           customer_phone, payment_method_id, payment_proof_url, amount_total,
-          deposit_amount, notes, starts_at, ends_at, status, created_at, updated_at
+          deposit_amount, party_size, notes, starts_at, ends_at, status, created_at, updated_at
         )
         SELECT
           ${bookingId}::uuid,
@@ -463,6 +537,7 @@ export async function createPublicBooking(
           ${paymentProofUrl},
           ${amountTotal}::numeric,
           ${depositAmount}::numeric,
+          ${partySize},
           ${notes},
           ${startsAt}::timestamptz,
           ${endsAt}::timestamptz,
@@ -474,9 +549,51 @@ export async function createPublicBooking(
           SELECT 1 FROM bookings existing
           WHERE existing.staff_id = ${assignedStaffId}::uuid
             AND existing.status <> 'cancelled'
-            AND existing.starts_at < ${endsAt}::timestamptz
-            AND existing.ends_at > ${startsAt}::timestamptz
+            AND existing.starts_at < ${endsAt}::timestamptz + make_interval(mins => ${business.buffer_minutes})
+            AND existing.ends_at > ${startsAt}::timestamptz - make_interval(mins => ${business.buffer_minutes})
         )
+        RETURNING id
+      `;
+    } else if (seatsMode) {
+      // No staff, seats-based capacity (restaurants, classes with seat caps).
+      inserted = await prisma.$queryRaw<Array<{ id: string }>>`
+        WITH slot_lock AS (
+          SELECT pg_advisory_xact_lock(
+            hashtext(${businessId}),
+            hashtext(${startsAt.toISOString()})
+          )
+        )
+        INSERT INTO bookings (
+          id, business_id, service_id, customer_name, customer_email, customer_phone,
+          payment_method_id, payment_proof_url, amount_total, deposit_amount, party_size,
+          notes, starts_at, ends_at, status, created_at, updated_at
+        )
+        SELECT
+          ${bookingId}::uuid,
+          ${businessId}::uuid,
+          ${serviceId}::uuid,
+          ${customerName},
+          ${customerEmail},
+          ${customerPhone},
+          ${requiresPaymentProof ? paymentMethodId : null}::uuid,
+          ${paymentProofUrl},
+          ${amountTotal}::numeric,
+          ${depositAmount}::numeric,
+          ${partySize},
+          ${notes},
+          ${startsAt}::timestamptz,
+          ${endsAt}::timestamptz,
+          'pending',
+          now(),
+          now()
+        FROM slot_lock
+        WHERE (
+          SELECT COALESCE(SUM(party_size), 0) FROM bookings
+          WHERE business_id = ${businessId}::uuid
+            AND status <> 'cancelled'
+            AND starts_at < ${endsAt}::timestamptz + make_interval(mins => ${business.buffer_minutes})
+            AND ends_at > ${startsAt}::timestamptz - make_interval(mins => ${business.buffer_minutes})
+        ) + ${partySize} <= ${service.seats_per_slot ?? 0}
         RETURNING id
       `;
     } else {
@@ -490,8 +607,8 @@ export async function createPublicBooking(
         )
         INSERT INTO bookings (
           id, business_id, service_id, customer_name, customer_email, customer_phone,
-          payment_method_id, payment_proof_url, amount_total, deposit_amount, notes,
-          starts_at, ends_at, status, created_at, updated_at
+          payment_method_id, payment_proof_url, amount_total, deposit_amount, party_size,
+          notes, starts_at, ends_at, status, created_at, updated_at
         )
         SELECT
           ${bookingId}::uuid,
@@ -504,6 +621,7 @@ export async function createPublicBooking(
           ${paymentProofUrl},
           ${amountTotal}::numeric,
           ${depositAmount}::numeric,
+          ${partySize},
           ${notes},
           ${startsAt}::timestamptz,
           ${endsAt}::timestamptz,
@@ -514,8 +632,9 @@ export async function createPublicBooking(
         WHERE (
           SELECT count(*) FROM bookings
           WHERE business_id = ${businessId}::uuid
-            AND starts_at = ${startsAt}::timestamptz
             AND status <> 'cancelled'
+            AND starts_at < ${endsAt}::timestamptz + make_interval(mins => ${business.buffer_minutes})
+            AND ends_at > ${startsAt}::timestamptz - make_interval(mins => ${business.buffer_minutes})
         ) < ${businessCapacity}
         RETURNING id
       `;
@@ -616,6 +735,7 @@ export async function createPublicBooking(
           currency: business.currency,
           depositAmount: depositAmount.toFixed(2),
           balanceAmount: (amountTotal - depositAmount).toFixed(2),
+          partySize,
           date: dateLabel,
           time: timeLabel,
           notes,

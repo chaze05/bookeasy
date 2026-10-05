@@ -39,6 +39,8 @@ export interface BookingService {
   duration: number;
   price: number;
   color: string;
+  party_size_enabled?: boolean;
+  max_party_size?: number;
 }
 
 export interface PaymentMethodData {
@@ -130,6 +132,7 @@ export function BookingWidget({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [partySize, setPartySize] = useState(1);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -141,6 +144,7 @@ export function BookingWidget({
     setSelectedSlot("");
     setSelectedStaffId("");
     setForm({ name: "", email: "", phone: "", notes: "" });
+    setPartySize(1);
     setSelectedPaymentType(paymentMethods[0]?.type ?? null);
     setPaymentProof(null);
   }
@@ -188,6 +192,7 @@ export function BookingWidget({
       fd.append("notes", form.notes);
       if (activePaymentMethod) fd.append("paymentMethodId", activePaymentMethod.id);
       if (selectedStaffId) fd.append("staffId", selectedStaffId);
+      if (service.party_size_enabled) fd.append("partySize", String(partySize));
       if (proof) fd.append("paymentProof", proof);
       try {
         const result = await createPublicBooking(fd);
@@ -419,6 +424,36 @@ export function BookingWidget({
                 transition={{ duration: 0.16 }}
                 className="flex flex-col gap-4"
               >
+                {service.party_size_enabled && (
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
+                    <div>
+                      <p className="text-xs font-medium text-zinc-300">Guests</p>
+                      <p className="text-[11px] text-zinc-600">
+                        Up to {service.max_party_size ?? 10} per booking
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPartySize((size) => Math.max(1, size - 1))}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center text-sm font-semibold text-zinc-100">{partySize}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPartySize((size) => Math.min(service.max_party_size ?? 10, size + 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {[
                   { icon: <User className="h-3.5 w-3.5 text-emerald-500" />, label: "Full Name", required: true, type: "text", key: "name" as const, placeholder: "Jane Smith" },
                   { icon: <Mail className="h-3.5 w-3.5 text-emerald-500" />, label: "Email", required: true, type: "email", key: "email" as const, placeholder: "jane@example.com" },

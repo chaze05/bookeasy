@@ -46,6 +46,9 @@ export interface Business {
   business_hours_end: string;
   realtime_enabled: boolean;
   status: BusinessStatus;
+  min_lead_hours: number;
+  booking_horizon_days: number;
+  buffer_minutes: number;
   deposit_type: "none" | "percent" | "fixed";
   deposit_value: number;
   paymongo_enabled: boolean;
@@ -74,6 +77,9 @@ export interface Service {
   price: number;
   color: string;
   is_active: boolean;
+  party_size_enabled: boolean;
+  max_party_size: number;
+  seats_per_slot: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -124,6 +130,7 @@ export interface Booking {
   amount_total: number | null;
   deposit_amount: number | null;
   payment_status: "unpaid" | "deposit_paid" | "paid" | "refunded";
+  party_size: number;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;

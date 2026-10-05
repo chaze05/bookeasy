@@ -22,6 +22,7 @@ interface OwnerBookingNotificationEmailProps {
   serviceName: string;
   price?: string;
   currency?: string;
+  partySize?: number;
   depositAmount?: string;
   balanceAmount?: string;
   date: string;
@@ -39,6 +40,7 @@ export const OwnerBookingNotificationEmail = ({
   serviceName,
   price,
   currency,
+  partySize,
   depositAmount,
   balanceAmount,
   date,
@@ -71,6 +73,9 @@ export const OwnerBookingNotificationEmail = ({
             <Section style={detailsContainer}>
               <Heading as="h3" style={h3}>Booking details</Heading>
               <Text style={detailItem}><strong>Service:</strong> {serviceName}</Text>
+              {partySize && partySize > 1 ? (
+                <Text style={detailItem}><strong>Guests:</strong> {partySize}</Text>
+              ) : null}
               <Text style={detailItem}><strong>Date:</strong> {date}</Text>
               <Text style={detailItem}><strong>Time:</strong> {time}</Text>
               {amount ? <Text style={detailItem}><strong>Price:</strong> {amount}</Text> : null}

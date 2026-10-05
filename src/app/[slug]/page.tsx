@@ -55,6 +55,8 @@ export default async function BookingPage({
           duration: true,
           price: true,
           color: true,
+          party_size_enabled: true,
+          max_party_size: true,
         },
         orderBy: { name: "asc" },
       },

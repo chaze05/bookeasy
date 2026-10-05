@@ -43,16 +43,30 @@ export const businessSchema = z.object({
   logo_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
-export const serviceSchema = z.object({
-  name: z.string().min(2, "Service name must be at least 2 characters"),
-  description: z.string().optional(),
-  duration: z.coerce
-    .number()
-    .int()
-    .min(5, "Duration must be at least 5 minutes"),
-  price: z.coerce.number().min(0, "Price cannot be negative"),
-  color: z.string().default("#10b981"),
-});
+export const serviceSchema = z
+  .object({
+    name: z.string().min(2, "Service name must be at least 2 characters"),
+    description: z.string().optional(),
+    duration: z.coerce
+      .number()
+      .int()
+      .min(5, "Duration must be at least 5 minutes"),
+    price: z.coerce.number().min(0, "Price cannot be negative"),
+    color: z.string().default("#10b981"),
+    party_size_enabled: z
+      .union([z.literal("on"), z.literal("true"), z.literal("false"), z.boolean(), z.null()])
+      .optional()
+      .transform((v) => v === "on" || v === "true" || v === true),
+    max_party_size: z.coerce.number().int().min(1).max(100).default(1),
+    seats_per_slot: z
+      .union([z.coerce.number().int().min(1).max(1000), z.literal(""), z.null()])
+      .optional()
+      .transform((v) => (v === "" || v === null || v === undefined ? null : Number(v))),
+  })
+  .refine(
+    (data) => !data.party_size_enabled || data.seats_per_slot === null || data.seats_per_slot >= data.max_party_size,
+    { message: "Seats per slot must be at least the maximum party size", path: ["seats_per_slot"] }
+  );
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;

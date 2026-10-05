@@ -130,6 +130,9 @@ function BookingRow({ booking, paymentMethods, currency }: BookingRowProps) {
         <div>
           <p>{booking.customer_name}</p>
           <p className="text-xs text-zinc-500">{booking.customer_email}</p>
+          {booking.party_size > 1 && (
+            <p className="text-xs text-emerald-400/80">{booking.party_size} guests</p>
+          )}
         </div>
       </TableCell>
       <TableCell>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { Loader2, Clock, Settings2, Zap, Wallet } from "lucide-react";
+import { Loader2, Clock, Settings2, Zap, Wallet, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateBookingSettings } from "@/actions/business";
@@ -42,6 +42,15 @@ export function BookingSettingsForm({ business, canUseDeposits = false }: Bookin
   const [depositValue, setDepositValue] = useState(
     business?.deposit_value ?? 0
   );
+  const [minLeadHours, setMinLeadHours] = useState(
+    business?.min_lead_hours ?? 0
+  );
+  const [horizonDays, setHorizonDays] = useState(
+    business?.booking_horizon_days ?? 60
+  );
+  const [bufferMinutes, setBufferMinutes] = useState(
+    business?.buffer_minutes ?? 0
+  );
 
   if (!business) {
     return (
@@ -63,6 +72,9 @@ export function BookingSettingsForm({ business, canUseDeposits = false }: Bookin
       fd.append("business_hours_start", hoursStart);
       fd.append("business_hours_end", hoursEnd);
       fd.append("realtime_enabled", String(realtimeEnabled));
+      fd.append("min_lead_hours", String(minLeadHours));
+      fd.append("booking_horizon_days", String(horizonDays));
+      fd.append("buffer_minutes", String(bufferMinutes));
       fd.append("deposit_type", canUseDeposits ? depositType : "none");
       fd.append("deposit_value", String(canUseDeposits ? depositValue : 0));
       try {
@@ -166,6 +178,61 @@ export function BookingSettingsForm({ business, canUseDeposits = false }: Bookin
               onChange={(e) => setHoursEnd(e.target.value)}
               className={inputClass}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Reservation rules */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-zinc-500" />
+          <h2 className="text-sm font-semibold text-zinc-100">Reservation rules</h2>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Minimum notice (hours)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={720}
+              value={minLeadHours}
+              onChange={(e) => setMinLeadHours(Number(e.target.value))}
+              className={inputClass}
+            />
+            <p className="text-xs text-zinc-600">
+              How soon before a slot bookings are accepted. 0 = anytime.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Book up to (days ahead)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={730}
+              value={horizonDays}
+              onChange={(e) => setHorizonDays(Number(e.target.value))}
+              className={inputClass}
+            />
+            <p className="text-xs text-zinc-600">
+              How far into the future the calendar opens.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-zinc-300">Buffer between bookings (min)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={240}
+              value={bufferMinutes}
+              onChange={(e) => setBufferMinutes(Number(e.target.value))}
+              className={inputClass}
+            />
+            <p className="text-xs text-zinc-600">
+              Cleanup / turnover gap after each appointment.
+            </p>
           </div>
         </div>
       </div>

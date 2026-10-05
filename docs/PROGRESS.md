@@ -10,6 +10,17 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-03 — Booking rules + party size / seats (branch `feat/booking-rules-party-addons`)
+- `migration_016.sql` (applied live): `businesses.min_lead_hours / booking_horizon_days / buffer_minutes`, `services.party_size_enabled / max_party_size / seats_per_slot`, `bookings.party_size`, plus `service_addons` + `booking_addons` tables (schema ready for the add-ons batch).
+- **Booking rules** enforced in slot listing, booking, and reschedule:
+  - minimum notice (slots before now + lead disappear; booking rejected with a clear message),
+  - booking horizon (dates beyond `booking_horizon_days` reject),
+  - turnover buffer (existing bookings occupy `[start − buffer, end + buffer]`, so back-to-back bookings leave a gap).
+- **Party size + seats:** services can ask for guests (1..max); when `seats_per_slot` is set, capacity is measured in seats (`SUM(party_size)`), otherwise by booking count. Party size is stored, shown in the owner email, bookings table, and manage page; the widget has a guests stepper and totals/deposits use the full price.
+- Settings UI: new "Reservation rules" card (notice / horizon / buffer). Service editor: "Party size / seats" section (toggle, max guests, seats per slot).
+- Verified with a live matrix: lead 24h (too-soon rejected, 2 days ok), horizon 5 days (6 rejected, 4 ok), buffer 30m (13:00 ok, 14:00 blocked, 14:30 ok), seats 10/max 6 (4 ok, 7 rejected, +4 ok → 8, +3 rejected, +2 fills to 10) — 15/16 automated checks, with the last one re-verified directly (widget guests stepper visible). Screenshots: 18 reservation rules, 19 service party size, 20 widget guests.
+- Still to come on this branch: add-ons (schema is in place; engine/UI pending).
+
 ### 2026-10-03 — Dynamic booking models: staff-less / class & table capacity (branch `feat/staff-booking-readiness`)
 - Fixed a real gap: `allow_multiple_bookings` was never enforced — capacity always used `max_bookings_per_slot`. Now capacity = `allow_multiple_bookings ? max_bookings_per_slot : 1` in slot listing, booking insert, and unassigned reschedules.
 - Verified the platform across booking models with a production build (12/12 checks):

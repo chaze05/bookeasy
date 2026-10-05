@@ -20,6 +20,9 @@ const bookingSettingsSchema = z
       .string()
       .regex(/^\d{2}:\d{2}$/, "Invalid time format"),
     realtime_enabled: z.string().transform((v) => v === "true"),
+    min_lead_hours: z.coerce.number().int().min(0).max(720),
+    booking_horizon_days: z.coerce.number().int().min(1).max(730),
+    buffer_minutes: z.coerce.number().int().min(0).max(240),
     deposit_type: z.enum(["none", "percent", "fixed"]),
     deposit_value: z.coerce.number().min(0).max(1_000_000),
   })
@@ -179,6 +182,9 @@ export async function updateBookingSettings(id: string, formData: FormData) {
     business_hours_start: formData.get("business_hours_start"),
     business_hours_end: formData.get("business_hours_end"),
     realtime_enabled: formData.get("realtime_enabled"),
+    min_lead_hours: formData.get("min_lead_hours"),
+    booking_horizon_days: formData.get("booking_horizon_days"),
+    buffer_minutes: formData.get("buffer_minutes"),
     deposit_type: formData.get("deposit_type"),
     deposit_value: formData.get("deposit_value"),
   });

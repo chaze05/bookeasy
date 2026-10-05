@@ -136,6 +136,7 @@ export default async function ManageBookingPage({
           <span className="flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-zinc-600" />
             {formatZonedTime(booking.starts_at, timeZone)} · {booking.service.duration} min
+            {booking.party_size > 1 ? ` · ${booking.party_size} guests` : ""}
           </span>
           <span className="flex items-center gap-2 text-xs text-zinc-600">
             <MapPin className="h-3.5 w-3.5" />

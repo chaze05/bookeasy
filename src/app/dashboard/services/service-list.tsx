@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, Loader2, Scissors, Clock, DollarSign } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -42,22 +41,31 @@ interface ServiceFormProps {
 function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormProps) {
   const [isPending, startTransition] = useTransition();
   const [color, setColor] = useState(defaultValues?.color ?? "#10b981");
+  const [partyEnabled, setPartyEnabled] = useState(Boolean(defaultValues?.party_size_enabled));
+  const [maxParty, setMaxParty] = useState<number>(defaultValues?.max_party_size ?? 4);
+  const [seatsPerSlot, setSeatsPerSlot] = useState<string>(
+    defaultValues?.seats_per_slot != null ? String(defaultValues.seats_per_slot) : ""
+  );
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ServiceInput>({
-    resolver: zodResolver(serviceSchema) as any,
+    resolver: zodResolver(serviceSchema) as unknown as Resolver<ServiceInput>,
     defaultValues: { color: "#10b981", ...defaultValues },
   });
 
   function submit(data: ServiceInput) {
     startTransition(async () => {
       const fd = new FormData();
-      Object.entries({ ...data, color }).forEach(([k, v]) =>
-        fd.append(k, String(v ?? ""))
-      );
+      Object.entries({ ...data, color }).forEach(([k, v]) => {
+        if (["party_size_enabled", "max_party_size", "seats_per_slot"].includes(k)) return;
+        fd.append(k, String(v ?? ""));
+      });
+      fd.append("party_size_enabled", partyEnabled ? "true" : "false");
+      fd.append("max_party_size", String(maxParty));
+      fd.append("seats_per_slot", seatsPerSlot.trim());
       try {
         await onSubmit(fd);
         toast.success(isEdit ? "Service updated" : "Service created");
@@ -113,6 +121,49 @@ function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormPr
             />
           ))}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <Label className="text-zinc-300">Party size / seats</Label>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Ask guests how many are coming and cap each slot by seats (tables, classes).
+            </p>
+          </div>
+          <Switch checked={partyEnabled} onCheckedChange={setPartyEnabled} />
+        </div>
+
+        {partyEnabled && (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-zinc-300">Max guests per booking</Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={maxParty}
+                onChange={(e) => setMaxParty(Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-zinc-300">Seats per slot (optional)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={1000}
+                value={seatsPerSlot}
+                placeholder="e.g. 40"
+                onChange={(e) => setSeatsPerSlot(e.target.value)}
+                className={inputClass}
+              />
+              <p className="text-xs text-zinc-600">
+                Total seats each slot. Blank = limit by booking count instead.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <DialogFooter>
@@ -245,6 +296,9 @@ function ServiceCard({ service }: ServiceCardProps) {
               duration: service.duration,
               price: service.price,
               color: service.color,
+              party_size_enabled: service.party_size_enabled,
+              max_party_size: service.max_party_size,
+              seats_per_slot: service.seats_per_slot,
             }}
             onSubmit={(fd) => updateService(service.id, fd)}
             onClose={() => setEditOpen(false)}
