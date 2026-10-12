@@ -180,3 +180,5 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 13. PayMongo integration (PH-first) with webhooks
 14. Deploy to Vercel: env vars, verified sender domain, smoke test
 15. Follow-ups: email owner on customer reschedule/cancel; refactor duplicated slot validation
+
+<!-- redeploy retry 2026-10-12 11:13:36Z -->
