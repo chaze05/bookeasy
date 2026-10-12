@@ -10,6 +10,11 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-03 — Public demo tenant
+- Demo account: `demo@bookeasy.app` (password shared in chat, not stored in code); business "Demo Studio" at `/demo` with massage (add-on: hot stones), pickleball court (party size + paddle/coaching extras) and a 12-seat yoga class; 30% deposit, GCash/cash, 2-hour notice, 60-day horizon, 15-min buffer, one blocked holiday, Business plan.
+- `scripts/reset-demo.mjs` — re-runs the whole demo setup and resets the demo password (run before demos to restore clean data).
+- Verified on production: booking with party 3 + 2×Paddle + Coaching → ₱800 total / ₱240 deposit, snapshots stored, manage page works, demo dashboard login works. Emails were still not delivered at the time of testing (Vercel email env vars / redeploy pending).
+
 ### 2026-10-03 — Add-ons / extras (branch `feat/booking-rules-party-addons`)
 - Dashboard → Services: each service card now has an **Extras** button opening a dialog to add/toggle/remove add-ons (name, price, max quantity) — `src/actions/addons.ts`, owner-scoped and validated.
 - Public widget: "Extras (optional)" list with quantity steppers (0..max) and a live extras subtotal; services without extras are unaffected.
