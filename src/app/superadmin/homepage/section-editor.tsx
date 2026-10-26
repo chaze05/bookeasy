@@ -9,10 +9,13 @@ import {
   Edit3,
   Eye,
   EyeOff,
+  Loader2,
   Plus,
   Trash2,
+  Wand2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   deleteHomepageSection,
   moveSectionDown,
@@ -20,6 +23,7 @@ import {
   toggleSectionActive,
   updateSectionContent,
 } from "@/actions/homepage";
+import { generateHomepageCopy } from "@/actions/ai";
 
 export interface SectionRow {
   id: string;
@@ -211,6 +215,57 @@ function ObjectList({
   );
 }
 
+function SectionAiHelper({
+  sectionKey,
+  onApply,
+}: {
+  sectionKey: string;
+  onApply: (heading: string, subheading: string) => void;
+}) {
+  const [brief, setBrief] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  async function generate() {
+    setGenerating(true);
+    try {
+      const fd = new FormData();
+      fd.set("section_key", sectionKey);
+      fd.set("brief", brief);
+      const { heading, subheading } = await generateHomepageCopy(fd);
+      onApply(heading, subheading);
+      toast.success("AI copy added — review and save");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI request failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 sm:flex-row sm:items-center">
+      <div className="shrink-0">
+        <p className="text-xs font-medium text-emerald-300">Write with AI</p>
+        <p className="text-[11px] text-zinc-500">Optional brief for the tone.</p>
+      </div>
+      <input
+        value={brief}
+        onChange={(e) => setBrief(e.target.value)}
+        placeholder='e.g. "friendly tone for salons"'
+        className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+      />
+      <button
+        type="button"
+        onClick={generate}
+        disabled={generating}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-xs font-semibold text-white hover:bg-emerald-400 disabled:opacity-50"
+      >
+        {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+        Suggest copy
+      </button>
+    </div>
+  );
+}
+
 function ContentEditor({
   sectionKey,
   draft,
@@ -287,6 +342,10 @@ function ContentEditor({
   if (sectionKey === "features") {
     return (
       <div className="grid gap-4">
+        <SectionAiHelper
+          sectionKey="features"
+          onApply={(heading, subheading) => setDraft({ ...draft, heading, subheading })}
+        />
         <Field label="Heading" value={textValue(draft.heading)} onChange={(v) => set("heading", v)} />
         <Field label="Subheading" value={textValue(draft.subheading)} multiline onChange={(v) => set("subheading", v)} />
         <ObjectList
@@ -306,6 +365,10 @@ function ContentEditor({
   if (sectionKey === "social_proof") {
     return (
       <div className="grid gap-4">
+        <SectionAiHelper
+          sectionKey="social_proof"
+          onApply={(heading) => setDraft({ ...draft, heading })}
+        />
         <Field label="Heading" value={textValue(draft.heading)} onChange={(v) => set("heading", v)} />
         <ObjectList
           label="Stats"
@@ -334,6 +397,10 @@ function ContentEditor({
   if (sectionKey === "pricing") {
     return (
       <div className="grid gap-4">
+        <SectionAiHelper
+          sectionKey="pricing"
+          onApply={(heading, subheading) => setDraft({ ...draft, heading, subheading })}
+        />
         <Field label="Heading" value={textValue(draft.heading)} onChange={(v) => set("heading", v)} />
         <Field label="Subheading" value={textValue(draft.subheading)} multiline onChange={(v) => set("subheading", v)} />
         <ObjectList
@@ -360,6 +427,10 @@ function ContentEditor({
   if (sectionKey === "cta") {
     return (
       <div className="grid gap-4">
+        <SectionAiHelper
+          sectionKey="cta"
+          onApply={(heading, subheading) => setDraft({ ...draft, heading, subheading })}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Heading" value={textValue(draft.heading)} onChange={(v) => set("heading", v)} />
           <Field label="Primary button text" value={textValue(draft.primary_cta_text)} onChange={(v) => set("primary_cta_text", v)} />
