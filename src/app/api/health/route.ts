@@ -27,6 +27,11 @@ export async function GET() {
     payments: {
       paymongoEncryptionKey: Boolean(process.env.PAYMENTS_ENCRYPTION_KEY),
     },
+    ai: {
+      provider: "gemini",
+      configured: Boolean(process.env.GEMINI_API_KEY),
+      model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+    },
     cron: {
       secretConfigured: Boolean(process.env.CRON_SECRET),
     },

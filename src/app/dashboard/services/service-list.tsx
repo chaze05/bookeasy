@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { createService, updateService, deleteService, toggleService } from "@/actions/services";
 import { createAddon, deleteAddon, toggleAddon } from "@/actions/addons";
+import { generateServiceDescription } from "@/actions/ai";
 import { serviceSchema, type ServiceInput } from "@/lib/validations";
 import type { Service } from "@/types";
 
@@ -51,11 +52,32 @@ function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormPr
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ServiceInput>({
     resolver: zodResolver(serviceSchema) as unknown as Resolver<ServiceInput>,
     defaultValues: { color: "#10b981", ...defaultValues },
   });
+
+  const [generating, setGenerating] = useState(false);
+
+  async function generateDescription() {
+    const fd = new FormData();
+    fd.set("name", watch("name") ?? "");
+    fd.set("duration", String(watch("duration") ?? ""));
+    fd.set("price", String(watch("price") ?? ""));
+    setGenerating(true);
+    try {
+      const { text } = await generateServiceDescription(fd);
+      setValue("description", text, { shouldDirty: true });
+      toast.success("AI draft added — edit as you like");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI request failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   function submit(data: ServiceInput) {
     startTransition(async () => {
@@ -89,8 +111,24 @@ function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormPr
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label className="text-zinc-300">Description</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-zinc-300">Description</Label>
+          <button
+            type="button"
+            onClick={generateDescription}
+            disabled={generating}
+            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 transition-colors hover:text-emerald-300 disabled:opacity-50"
+          >
+            {generating ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            Write with AI
+          </button>
+        </div>
         <Textarea placeholder="Optional description…" {...register("description")} />
+        <p className="text-xs text-zinc-600">Draft with AI, then edit before saving.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
