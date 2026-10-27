@@ -1,5 +1,5 @@
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
-const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-1.5-flash"];
 const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
@@ -39,7 +39,7 @@ async function requestModel(model: string, prompt: string, apiKey: string): Prom
   if (!response.ok) {
     const detail = body?.error?.message ?? `HTTP ${response.status}`;
     const error = new Error(`AI request failed: ${detail}`);
-    throw Object.assign(error, { retryableModel: response.status === 404 || /no longer available|not found|not supported/i.test(detail) });
+    throw Object.assign(error, { retryableModel: response.status === 404 || response.status === 429 || response.status >= 500 || /no longer available|not found|not supported|high demand|overloaded|try again later|resource exhausted/i.test(detail) });
   }
 
   const text =
