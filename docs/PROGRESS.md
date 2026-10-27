@@ -182,3 +182,5 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 15. Follow-ups: email owner on customer reschedule/cancel; refactor duplicated slot validation
 
 <!-- redeploy retry 2026-10-12 11:13:36Z -->
+
+<!-- deploy retry 2026-10-27 10:00:47Z -->
