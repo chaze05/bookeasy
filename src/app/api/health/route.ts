@@ -30,7 +30,7 @@ export async function GET() {
     ai: {
       provider: "gemini",
       configured: Boolean(process.env.GEMINI_API_KEY),
-      model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+      model: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
     },
     cron: {
       secretConfigured: Boolean(process.env.CRON_SECRET),
