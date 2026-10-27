@@ -88,6 +88,8 @@ export async function createBusiness(formData: FormData) {
       ...rest,
       contact_email: contact_email || null,
       logo_url: logo_url || null,
+      plan: "free",
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     },
   });
 
@@ -116,7 +118,7 @@ export async function updatePaymongoSettings(formData: FormData) {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true, paymongo_secret_key_encrypted: true, plan: true, plan_expires_at: true },
+    select: { id: true, paymongo_secret_key_encrypted: true, plan: true, plan_expires_at: true, trial_ends_at: true },
   });
   if (!business) throw new Error("No business found");
 
@@ -192,7 +194,7 @@ export async function updateBookingSettings(id: string, formData: FormData) {
 
   const planRecord = await prisma.business.findFirst({
     where: { id, owner_id: user.id },
-    select: { plan: true, plan_expires_at: true },
+    select: { plan: true, plan_expires_at: true, trial_ends_at: true },
   });
   if (!planRecord) throw new Error("Business not found");
   if (parsed.data.deposit_type !== "none" && !PLANS[effectivePlan(planRecord)].deposits) {

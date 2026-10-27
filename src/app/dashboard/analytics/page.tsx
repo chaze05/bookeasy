@@ -22,7 +22,7 @@ export default async function AnalyticsPage() {
 
   const business = await prisma.business.findFirst({
     where: { owner_id: user.id },
-    select: { id: true, plan: true, plan_expires_at: true },
+    select: { id: true, plan: true, plan_expires_at: true, trial_ends_at: true },
   });
 
   if (!business) {

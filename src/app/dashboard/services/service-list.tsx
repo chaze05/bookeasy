@@ -69,9 +69,15 @@ function ServiceForm({ defaultValues, onSubmit, onClose, isEdit }: ServiceFormPr
     fd.set("price", String(watch("price") ?? ""));
     setGenerating(true);
     try {
-      const { text } = await generateServiceDescription(fd);
-      setValue("description", text, { shouldDirty: true });
-      toast.success("AI draft added — edit as you like");
+      const result = await generateServiceDescription(fd);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if (result.text) {
+        setValue("description", result.text, { shouldDirty: true });
+        toast.success("AI draft added — edit as you like");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "AI request failed");
     } finally {

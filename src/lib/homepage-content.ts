@@ -106,7 +106,7 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
       title_highlight: "just works.",
       subtitle:
         "Give your clients an effortless booking experience while you stay in control with a beautiful, powerful dashboard.",
-      primary_cta_text: "Start for free",
+      primary_cta_text: "Start 14-day trial",
       primary_cta_href: "/register",
       secondary_cta_text: "See a live demo",
       secondary_cta_href: "/glow-beauty-studio",
@@ -210,17 +210,16 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
     content: {
       heading: "Simple, transparent pricing",
       subheading:
-        "Start free, then upgrade when you outgrow it. No hidden fees, cancel anytime.",
-      billing_note: "Prices in PHP. VAT may apply.",
+        "Start with a 14-day free trial, then pick the plan that fits. No hidden fees, cancel anytime.",
+      billing_note: "14-day free trial on every plan. Prices in PHP, no credit card required.",
       plans: [
         {
           name: "Starter",
-          price: "₱0",
+          price: "₱799",
           period: "/month",
-          description: "For solo owners taking their first online bookings.",
-          features:
+          description: "For solo owners taking their first online bookings.",          features:
             "1 staff member\n50 bookings / month\nPublic booking page\nGCash, Maya, bank & cash payments\nEmail notifications",
-          cta_text: "Start for free",
+          cta_text: "Start 14-day trial",
           cta_href: "/register",
           highlighted: "",
           badge: "",
@@ -259,11 +258,11 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
     content: {
       heading: "Ready to take back your schedule?",
       subheading: "Create your business in minutes.",
-      primary_cta_text: "Get started for free",
+      primary_cta_text: "Start 14-day trial",
       primary_cta_href: "/register",
       secondary_cta_text: "Sign in",
       secondary_cta_href: "/login",
-      trust_items: ["No credit card required", "Cancel any time", "Free plan available"],
+      trust_items: ["No credit card required", "Cancel any time", "14-day free trial"],
     },
   },
 ];

@@ -8,7 +8,7 @@ import { BookingSettingsForm } from "./booking-settings-form";
 import { PaymentMethodsForm } from "./payment-methods-form";
 import { PaymongoSettingsForm } from "./paymongo-settings-form";
 import { SubscriptionForm } from "./subscription-form";
-import { planDefinition, canUse } from "@/lib/plans";
+import { planDefinition, canUse, isInTrial, PLANS } from "@/lib/plans";
 import type { Profile, Business } from "@/types";
 
 export const metadata = { title: "Settings" };
@@ -88,15 +88,19 @@ export default async function SettingsPage() {
   }
   const subscriptionMethods = [...subscriptionMethodMap.values()];
 
+  const trialActive = rawBusiness ? isInTrial(rawBusiness) : false;
   const planInfo = rawBusiness
     ? planDefinition(rawBusiness)
     : planDefinition({});
   const currentPlan = {
-    name: planInfo.name,
-    price: planInfo.price,
-    expiresAt: rawBusiness?.plan_expires_at
-      ? rawBusiness.plan_expires_at.toISOString()
-      : null,
+    name: trialActive ? "Pro (trial)" : planInfo.name,
+    price: trialActive ? PLANS.pro.price : planInfo.price,
+    expiresAt: trialActive
+      ? (rawBusiness?.trial_ends_at?.toISOString() ?? null)
+      : rawBusiness?.plan_expires_at
+        ? rawBusiness.plan_expires_at.toISOString()
+        : null,
+    isTrial: trialActive,
   };
   const canUseDeposits = rawBusiness ? canUse("deposits", rawBusiness) : false;
   const canUseOnlinePayments = rawBusiness ? canUse("onlinePayments", rawBusiness) : false;

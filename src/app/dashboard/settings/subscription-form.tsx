@@ -33,7 +33,7 @@ export function SubscriptionForm({
 }: {
   payments: SubscriptionPayment[];
   methods: SubscriptionMethod[];
-  currentPlan: { name: string; price: number; expiresAt: string | null };
+  currentPlan: { name: string; price: number; expiresAt: string | null; isTrial?: boolean };
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -65,11 +65,17 @@ export function SubscriptionForm({
           </p>
         </div>
         <p className="text-xs text-zinc-500">
-          {currentPlan.expiresAt
-            ? `Renews / expires ${new Date(currentPlan.expiresAt).toLocaleDateString()}`
-            : currentPlan.price === 0
-              ? "Free forever"
-              : "Active"}
+          {currentPlan.isTrial
+            ? `Trial ends ${
+                currentPlan.expiresAt
+                  ? new Date(currentPlan.expiresAt).toLocaleDateString()
+                  : "soon"
+              } — choose a plan to keep accepting bookings`
+            : currentPlan.expiresAt
+              ? `Renews / expires ${new Date(currentPlan.expiresAt).toLocaleDateString()}`
+              : currentPlan.price === 0
+                ? "No active plan"
+                : "Active"}
         </p>
       </div>
 
@@ -91,6 +97,7 @@ export function SubscriptionForm({
               defaultValue="pro"
               className="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
             >
+              <option value="starter">Starter — ₱799/month</option>
               <option value="pro">Pro — ₱1,299/month</option>
               <option value="business">Business — ₱1,999/month</option>
             </select>

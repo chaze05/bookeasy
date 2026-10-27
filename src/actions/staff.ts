@@ -37,7 +37,7 @@ export async function createStaffMember(formData: FormData) {
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { plan: true, plan_expires_at: true },
+    select: { plan: true, plan_expires_at: true, trial_ends_at: true },
   });
   const limit = planDefinition(business ?? {}).staffLimit;
   if (limit !== null) {

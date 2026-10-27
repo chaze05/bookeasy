@@ -170,7 +170,8 @@ export async function submitSubscriptionPayment(formData: FormData) {
   const business = await getOwnedBusiness();
   const paymentMethodType = String(formData.get("payment_method_type") ?? "").trim();
   const planRaw = String(formData.get("plan") ?? "pro");
-  const plan = planRaw === "business" ? "business" : planRaw === "pro" ? "pro" : null;
+  const plan =
+    planRaw === "business" ? "business" : planRaw === "starter" ? "starter" : planRaw === "pro" ? "pro" : null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const proof = formData.get("payment_proof");
 

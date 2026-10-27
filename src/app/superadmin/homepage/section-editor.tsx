@@ -231,8 +231,12 @@ function SectionAiHelper({
       const fd = new FormData();
       fd.set("section_key", sectionKey);
       fd.set("brief", brief);
-      const { heading, subheading } = await generateHomepageCopy(fd);
-      onApply(heading, subheading);
+      const result = await generateHomepageCopy(fd);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      onApply(result.heading ?? "", result.subheading ?? "");
       toast.success("AI copy added — review and save");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "AI request failed");

@@ -319,6 +319,7 @@ export async function createPublicBooking(
         paymongo_secret_key_encrypted: true,
         plan: true,
         plan_expires_at: true,
+        trial_ends_at: true,
       },
     }),
     prisma.service.findUnique({

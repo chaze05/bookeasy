@@ -10,6 +10,15 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-27 — Paid Starter (₱799) + 14-day free trial
+- `migration_018.sql` (applied live): `businesses.trial_ends_at`; plan check now includes `starter`; existing free businesses receive a 14-day trial; live homepage pricing updated to Starter ₱799 with trial copy.
+- Plans: Starter ₱799 (1 staff, 50 bookings/mo, manual payments) · Pro ₱1,299 · Business ₱1,999. `free` is now the internal trial state: 14 days of Pro features, then locked (no new bookings, paid features disabled) until subscribing.
+- New businesses get `trial_ends_at = now + 14 days` on creation; approving a subscription payment activates the chosen plan for 30 days and clears the trial; superadmin manual selector now includes Starter.
+- Public page shows "Online booking is temporarily unavailable" with disabled buttons when the trial has ended; booking endpoint rejects with the not-accepting message.
+- Settings subscription card shows "Pro (trial) — Trial ends <date>" during the trial.
+- Also fixed AI error visibility: server actions now return `{ error }` objects (production masks thrown action errors), so users see the real message.
+- Verified: plan-logic unit checks (trial→pro, expired→locked, starter/business mapping); local E2E (expired trial blocks page + booking; active trial allows booking; settings card shows trial). Screenshots 33 (expired public page) and 34 (trial settings card).
+
 ### 2026-10-03 — Public demo tenant
 - Demo account: `demo@bookeasy.app` (password shared in chat, not stored in code); business "Demo Studio" at `/demo` with massage (add-on: hot stones), pickleball court (party size + paddle/coaching extras) and a 12-seat yoga class; 30% deposit, GCash/cash, 2-hour notice, 60-day horizon, 15-min buffer, one blocked holiday, Business plan.
 - `scripts/reset-demo.mjs` — re-runs the whole demo setup and resets the demo password (run before demos to restore clean data).

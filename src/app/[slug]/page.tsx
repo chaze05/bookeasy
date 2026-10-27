@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { canUse } from "@/lib/plans";
+import { canUse, effectivePlan } from "@/lib/plans";
 import { BusinessHero } from "@/components/business/hero";
 import { ServicesSection } from "@/components/business/services";
 import { StaffSection } from "@/components/business/staff";
@@ -44,6 +44,7 @@ export default async function BookingPage({
       deposit_value: true,
       plan: true,
       plan_expires_at: true,
+      trial_ends_at: true,
       business_hours_start: true,
       business_hours_end: true,
       services: {
@@ -86,6 +87,8 @@ export default async function BookingPage({
     addons: s.addons.map((addon) => ({ ...addon, price: Number(addon.price) })),
   }));
 
+  const bookingBlocked = effectivePlan(business) === "free";
+
   return (
     <main className="min-h-screen bg-zinc-950">
       <BusinessHero
@@ -114,6 +117,7 @@ export default async function BookingPage({
           full_name: s.full_name,
           avatar_url: s.avatar_url,
         }))}
+        bookingBlocked={bookingBlocked}
       />
 
       <StaffSection staff={business.staff} />

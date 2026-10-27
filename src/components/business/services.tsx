@@ -18,6 +18,7 @@ interface ServicesSectionProps {
   services: BookingService[];
   paymentMethods?: PaymentMethodData[];
   staff?: { id: string; full_name: string; avatar_url: string | null }[];
+  bookingBlocked?: boolean;
 }
 
 const container = {
@@ -34,7 +35,7 @@ const item = {
   },
 };
 
-export function ServicesSection({ business, services, paymentMethods = [], staff = [] }: ServicesSectionProps) {
+export function ServicesSection({ business, services, paymentMethods = [], staff = [], bookingBlocked = false }: ServicesSectionProps) {
   const [selected, setSelected] = useState<BookingService | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -64,6 +65,15 @@ export function ServicesSection({ business, services, paymentMethods = [], staff
             Choose a service and book your appointment in seconds.
           </p>
         </motion.div>
+
+        {bookingBlocked && (
+          <div className="mb-10 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-6 py-4 text-center">
+            <p className="text-sm font-medium text-amber-300">Online booking is temporarily unavailable</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Please contact the business directly to schedule an appointment.
+            </p>
+          </div>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -116,9 +126,10 @@ export function ServicesSection({ business, services, paymentMethods = [], staff
 
                 <Button
                   onClick={() => book(svc)}
-                  className="mt-5 w-full border border-zinc-700 bg-zinc-800 text-zinc-100 transition-colors duration-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-white"
+                  disabled={bookingBlocked}
+                  className="mt-5 w-full border border-zinc-700 bg-zinc-800 text-zinc-100 transition-colors duration-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-zinc-700 disabled:hover:bg-zinc-800"
                 >
-                  Book Now
+                  {bookingBlocked ? "Bookings paused" : "Book Now"}
                 </Button>
               </div>
             </motion.div>

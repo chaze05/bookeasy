@@ -36,6 +36,7 @@ export async function GET(request: Request) {
           contact_email: true,
           plan: true,
           plan_expires_at: true,
+          trial_ends_at: true,
         },
       },
       service: { select: { name: true } },

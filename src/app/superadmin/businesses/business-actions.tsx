@@ -35,7 +35,7 @@ export function BusinessActions({ businessId, status, plan }: BusinessActionsPro
   function handlePlanChange(next: string) {
     startTransition(async () => {
       try {
-        await setBusinessPlan(businessId, next as "free" | "pro" | "business");
+        await setBusinessPlan(businessId, next as "free" | "starter" | "pro" | "business");
         toast.success(`Plan set to ${next}`);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Action failed");
@@ -53,6 +53,7 @@ export function BusinessActions({ businessId, status, plan }: BusinessActionsPro
         title="Subscription plan"
       >
         <option value="free">Free</option>
+        <option value="starter">Starter</option>
         <option value="pro">Pro</option>
         <option value="business">Business</option>
       </select>

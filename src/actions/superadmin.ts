@@ -245,7 +245,8 @@ export async function adminApproveSubscriptionPayment(id: string) {
 
   // Activate the plan the business paid for: 30 days from now (extend if
   // they already have time remaining on the same plan).
-  const plan = payment.plan === 'business' ? 'business' : 'pro';
+  const plan =
+    payment.plan === "business" ? "business" : payment.plan === "starter" ? "starter" : "pro";
   const current = await prisma.business.findUnique({
     where: { id: payment.business_id },
     select: { plan_expires_at: true },
@@ -259,7 +260,13 @@ export async function adminApproveSubscriptionPayment(id: string) {
 
   await prisma.business.update({
     where: { id: payment.business_id },
-    data: { status: 'active', plan, plan_expires_at: expiresAt, updated_at: new Date() },
+    data: {
+      status: 'active',
+      plan,
+      plan_expires_at: expiresAt,
+      trial_ends_at: null,
+      updated_at: new Date(),
+    },
   });
   revalidatePath('/superadmin');
   revalidatePath('/dashboard');
@@ -275,16 +282,16 @@ export async function adminRejectSubscriptionPayment(id: string, notes?: string)
   revalidatePath('/superadmin');
 }
 
-export async function setBusinessPlan(businessId: string, plan: "free" | "pro" | "business") {
+export async function setBusinessPlan(businessId: string, plan: "free" | "starter" | "pro" | "business") {
   await assertSuperadmin();
-  if (!["free", "pro", "business"].includes(plan)) throw new Error("Invalid plan");
+  if (!["free", "starter", "pro", "business"].includes(plan)) throw new Error("Invalid plan");
 
   const expiresAt =
     plan === "free" ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   await prisma.business.update({
     where: { id: businessId },
-    data: { plan, plan_expires_at: expiresAt, updated_at: new Date() },
+    data: { plan, plan_expires_at: expiresAt, trial_ends_at: null, updated_at: new Date() },
   });
 
   revalidatePath("/superadmin/businesses");
