@@ -210,8 +210,8 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
     content: {
       heading: "Simple, transparent pricing",
       subheading:
-        "Start with a 14-day free trial, then pick the plan that fits. No hidden fees, cancel anytime.",
-      billing_note: "14-day free trial on every plan. Prices in PHP, no credit card required.",
+        "Start with a 14-day free trial on Pro, or pick Starter right away. No hidden fees, cancel anytime.",
+      billing_note: "14-day free trial on Pro. Prices in PHP, no credit card required.",
       plans: [
         {
           name: "Starter",
@@ -219,7 +219,7 @@ export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionRecord[] = [
           period: "/month",
           description: "For solo owners taking their first online bookings.",          features:
             "1 staff member\n50 bookings / month\nPublic booking page\nGCash, Maya, bank & cash payments\nEmail notifications",
-          cta_text: "Start 14-day trial",
+          cta_text: "Choose Starter",
           cta_href: "/register",
           highlighted: "",
           badge: "",

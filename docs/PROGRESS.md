@@ -10,6 +10,11 @@ Running log of completed work, decisions, and pending items. Newest entries at t
 
 ## Completed
 
+### 2026-10-27 — Trial only on Pro + Gemini model fix
+- Free trial is now advertised **only on Pro (₱1,299)**. Starter (₱799) and Business (₱1,999) are billed immediately: Starter card CTA "Choose Starter", billing note "14-day free trial on Pro". `migration_019.sql` applied live; fallback copy updated.
+- Fixed Gemini integration after Google retired `gemini-2.0-flash`: default model is now `gemini-2.5-flash`, with automatic fallback to `gemini-3.8-flash` / `gemini-1.5-flash` on retired-model or high-demand/429/5xx responses.
+- AI actions return structured `{ error }` results so production users see real messages instead of Next's masked error.
+
 ### 2026-10-27 — Paid Starter (₱799) + 14-day free trial
 - `migration_018.sql` (applied live): `businesses.trial_ends_at`; plan check now includes `starter`; existing free businesses receive a 14-day trial; live homepage pricing updated to Starter ₱799 with trial copy.
 - Plans: Starter ₱799 (1 staff, 50 bookings/mo, manual payments) · Pro ₱1,299 · Business ₱1,999. `free` is now the internal trial state: 14 days of Pro features, then locked (no new bookings, paid features disabled) until subscribing.
